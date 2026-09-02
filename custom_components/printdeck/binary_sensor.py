@@ -64,6 +64,10 @@ async def async_setup_entry(
 
     @callback
     def async_add_new_printers() -> None:
+        current_printer_ids = {
+            printer.printer_id for printer in coordinator.data.printers
+        }
+        known_printers.intersection_update(current_printer_ids)
         entities: list[PrintDeckBinarySensor] = []
         for printer in coordinator.data.printers:
             if printer.printer_id in known_printers:

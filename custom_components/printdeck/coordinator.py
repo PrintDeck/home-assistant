@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import (
@@ -21,6 +22,7 @@ from .api import (
     PrintDeckUnsupportedError,
 )
 from .const import DEFAULT_UPDATE_INTERVAL, DOMAIN
+from .identity import device_belongs_to_missing_printer
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -72,7 +74,23 @@ class PrintDeckCoordinator(DataUpdateCoordinator[PrintDeckCoordinatorData]):
             raise UpdateFailed("PrintDeck API is not supported") from err
         except PrintDeckApiError as err:
             raise UpdateFailed(str(err)) from err
+        self._async_remove_missing_printer_devices(printers)
         return PrintDeckCoordinatorData(info=self.info, printers=printers)
+
+    def _async_remove_missing_printer_devices(
+        self, printers: tuple[PrintDeckPrinter, ...]
+    ) -> None:
+        """Remove child devices absent from a complete, successful snapshot."""
+        assert self.info is not None
+        current_printer_ids = {printer.printer_id for printer in printers}
+        device_registry = dr.async_get(self.hass)
+        for device in dr.async_entries_for_config_entry(
+            device_registry, self.config_entry.entry_id
+        ):
+            if device_belongs_to_missing_printer(
+                self.info.device_id, current_printer_ids, device.identifiers
+            ):
+                device_registry.async_remove_device(device.id)
 
     def printer(self, printer_id: str) -> PrintDeckPrinter | None:
         """Return one printer from the in-memory snapshot."""

@@ -84,6 +84,8 @@
       "bed_temperature": {"name": "Bed temperature"},
       "bed_target_temperature": {"name": "Bed target temperature"},
       "chamber_temperature": {"name": "Chamber temperature"},
+      "network_address": {"name": "Network address"},
+      "network_port": {"name": "Network port"},
       "connection_state": {
         "name": "Connection state",
         "state": {"unknown": "Unknown", "stopped": "Stopped", "waiting_for_network": "Waiting for network", "connecting": "Connecting", "online": "Online", "offline": "Offline"}

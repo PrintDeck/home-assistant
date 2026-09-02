@@ -174,6 +174,22 @@ SENSORS: tuple[PrintDeckSensorEntityDescription, ...] = (
         value_fn=lambda printer: printer.chamber_current_c,
     ),
     PrintDeckSensorEntityDescription(
+        key="network_address",
+        translation_key="network_address",
+        icon="mdi:ip-network-outline",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        available_when_stale=True,
+        value_fn=lambda printer: printer.network_address,
+    ),
+    PrintDeckSensorEntityDescription(
+        key="network_port",
+        translation_key="network_port",
+        icon="mdi:ethernet",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        available_when_stale=True,
+        value_fn=lambda printer: printer.network_port,
+    ),
+    PrintDeckSensorEntityDescription(
         key="connection_state",
         translation_key="connection_state",
         icon="mdi:lan-connect",
@@ -217,6 +233,10 @@ async def async_setup_entry(
 
     @callback
     def async_add_new_printers() -> None:
+        current_printer_ids = {
+            printer.printer_id for printer in coordinator.data.printers
+        }
+        known_printers.intersection_update(current_printer_ids)
         entities: list[PrintDeckSensor] = []
         for printer in coordinator.data.printers:
             if printer.printer_id in known_printers:

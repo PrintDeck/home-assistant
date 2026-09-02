@@ -64,7 +64,7 @@ def load_api_module() -> ModuleType:
     package.__path__ = [str(PUBLIC_COMPONENT)]
     sys.modules["printdeck"] = package
 
-    for name in ("const", "api"):
+    for name in ("const", "identity", "api"):
         qualified_name = f"printdeck.{name}"
         spec = importlib.util.spec_from_file_location(
             qualified_name, PUBLIC_COMPONENT / f"{name}.py"
@@ -78,6 +78,7 @@ def load_api_module() -> ModuleType:
 
 API = load_api_module()
 CONST = sys.modules["printdeck.const"]
+IDENTITY = sys.modules["printdeck.identity"]
 
 
 def info_payload() -> dict[str, object]:
@@ -95,20 +96,27 @@ def info_payload() -> dict[str, object]:
 
 
 def printer_payload(
-    *, phase: str = "printing", activity: str = "printing"
+    *,
+    printer_id: int = 4278190081,
+    name: str = "Workshop printer",
+    protocol: str = "moonraker",
+    endpoint: str = "192.0.2.40:7125",
+    phase: str = "printing",
+    activity: str = "printing",
 ) -> dict[str, object]:
     """Return one complete normalized printer item."""
     return {
         "printer": {
-            "id": 4278190081,
-            "name": "Workshop printer",
-            "protocol": "moonraker",
+            "id": printer_id,
+            "name": name,
+            "protocol": protocol,
+            "endpoint": endpoint,
             "manufacturer": "Voron",
             "model": "2.4",
             "selected": True,
         },
         "status": {
-            "printer_id": 4278190081,
+            "printer_id": printer_id,
             "connection": {
                 "state": "online",
                 "reachability": "online",
@@ -161,6 +169,100 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(printer.progress_percent, 52.5)
         self.assertEqual(printer.nozzle_current_c, 220.1)
         self.assertIsNone(printer.chamber_current_c)
+        self.assertEqual(printer.network_address, "192.0.2.40")
+        self.assertEqual(printer.network_port, 7125)
+
+    def test_bambu_endpoint_uses_the_local_mqtt_port(self) -> None:
+        printer = API.parse_snapshot(
+            {
+                "api_version": "v1",
+                "printers": [
+                    printer_payload(
+                        protocol="bambu_lan", endpoint="printer-a1mini.local"
+                    )
+                ],
+            }
+        )[0]
+
+        self.assertEqual(printer.network_address, "printer-a1mini.local")
+        self.assertEqual(printer.network_port, 8883)
+
+    def test_moonraker_endpoint_reports_the_effective_port(self) -> None:
+        endpoints = {
+            "printer.local": 7125,
+            "http://printer.local": 80,
+            "https://printer.local": 443,
+            "https://printer.local:9443": 9443,
+        }
+
+        for endpoint, expected_port in endpoints.items():
+            with self.subTest(endpoint=endpoint):
+                printer = API.parse_snapshot(
+                    {
+                        "api_version": "v1",
+                        "printers": [printer_payload(endpoint=endpoint)],
+                    }
+                )[0]
+                self.assertEqual(printer.network_address, "printer.local")
+                self.assertEqual(printer.network_port, expected_port)
+
+    def test_identical_printer_names_keep_distinct_stable_identities(self) -> None:
+        device_id = "printdeck-a1b2c3d4e5f6"
+        printer_ids = [str(1000 + index) for index in range(10)]
+        unique_ids = {
+            IDENTITY.printer_entity_unique_id(device_id, printer_id, "progress")
+            for printer_id in printer_ids
+        }
+
+        self.assertEqual(len(unique_ids), 10)
+
+    def test_endpoint_change_does_not_change_entity_identity(self) -> None:
+        before = API.parse_snapshot(
+            {
+                "api_version": "v1",
+                "printers": [printer_payload(endpoint="192.0.2.40:7125")],
+            }
+        )[0]
+        after = API.parse_snapshot(
+            {
+                "api_version": "v1",
+                "printers": [printer_payload(endpoint="192.0.2.99:8125")],
+            }
+        )[0]
+
+        before_unique_id = IDENTITY.printer_entity_unique_id(
+            "printdeck-a1b2c3d4e5f6", before.printer_id, "progress"
+        )
+        after_unique_id = IDENTITY.printer_entity_unique_id(
+            "printdeck-a1b2c3d4e5f6", after.printer_id, "progress"
+        )
+        self.assertEqual(before_unique_id, after_unique_id)
+        self.assertNotEqual(before.network_address, after.network_address)
+        self.assertNotEqual(before.network_port, after.network_port)
+
+    def test_only_missing_child_devices_are_marked_for_removal(self) -> None:
+        device_id = "printdeck-a1b2c3d4e5f6"
+        current_printer_ids = {"101", "102"}
+
+        self.assertFalse(
+            IDENTITY.device_belongs_to_missing_printer(
+                device_id, current_printer_ids, {("printdeck", device_id)}
+            )
+        )
+        self.assertFalse(
+            IDENTITY.device_belongs_to_missing_printer(
+                device_id,
+                current_printer_ids,
+                {("printdeck", f"{device_id}:101")},
+            )
+        )
+        self.assertTrue(
+            IDENTITY.device_belongs_to_missing_printer(
+                device_id,
+                current_printer_ids,
+                {("printdeck", f"{device_id}:103")},
+            )
+        )
 
     def test_every_published_phase_and_activity_is_accepted(self) -> None:
         for phase in CONST.PHASE_OPTIONS:

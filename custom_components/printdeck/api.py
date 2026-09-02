@@ -8,6 +8,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from time import monotonic
 from typing import Any
+from urllib.parse import urlsplit
 
 from aiohttp import ClientError, ClientSession
 
@@ -73,6 +74,8 @@ class PrintDeckPrinter:
     protocol: str
     manufacturer: str | None
     model: str | None
+    network_address: str
+    network_port: int
     selected: bool
     connection_state: str
     reachability: str
@@ -187,6 +190,11 @@ def parse_printer(printer_value: Any, status_value: Any) -> PrintDeckPrinter:
             "Printer identity does not match its status"
         )
 
+    protocol = _string(printer.get("protocol"), "printer.protocol", default="unknown")
+    assert protocol is not None
+    network_address, network_port = _parse_printer_endpoint(
+        _string(printer.get("endpoint"), "printer.endpoint") or "", protocol
+    )
     progress = _number(
         job.get("progress_percent"), "status.job.progress_percent", default=0.0
     )
@@ -194,12 +202,13 @@ def parse_printer(printer_value: Any, status_value: Any) -> PrintDeckPrinter:
     return PrintDeckPrinter(
         printer_id=str(printer_id),
         name=_string(printer.get("name"), "printer.name") or f"Printer {printer_id}",
-        protocol=_string(printer.get("protocol"), "printer.protocol", default="unknown")
-        or "unknown",
+        protocol=protocol,
         manufacturer=_string(
             printer.get("manufacturer"), "printer.manufacturer", nullable=True
         ),
         model=_string(printer.get("model"), "printer.model", nullable=True),
+        network_address=network_address,
+        network_port=network_port,
         selected=_boolean(printer.get("selected"), "printer.selected", default=False),
         connection_state=_string(
             connection.get("state"), "status.connection.state", default="unknown"
@@ -266,6 +275,42 @@ def parse_printer(printer_value: Any, status_value: Any) -> PrintDeckPrinter:
             nullable=True,
         ),
     )
+
+
+def _parse_printer_endpoint(endpoint: str, protocol: str) -> tuple[str, int]:
+    """Split a credential-free PrintDeck endpoint into an address and port."""
+    if not endpoint or any(character.isspace() for character in endpoint):
+        raise PrintDeckInvalidResponseError("printer.endpoint is invalid")
+    if protocol == "bambu_lan":
+        if "://" in endpoint or any(character in endpoint for character in "/@?#:"):
+            raise PrintDeckInvalidResponseError("printer.endpoint is invalid")
+        return endpoint, 8883
+    if protocol != "moonraker":
+        raise PrintDeckInvalidResponseError("printer.protocol is not supported")
+
+    has_explicit_scheme = "://" in endpoint
+    candidate = endpoint if has_explicit_scheme else f"http://{endpoint}"
+    try:
+        parsed = urlsplit(candidate)
+        if parsed.port is not None:
+            port = parsed.port
+        elif not has_explicit_scheme:
+            port = 7125
+        else:
+            port = 443 if parsed.scheme == "https" else 80
+    except ValueError as err:
+        raise PrintDeckInvalidResponseError("printer.endpoint is invalid") from err
+    if (
+        parsed.scheme not in {"http", "https"}
+        or not parsed.hostname
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.path not in {"", "/"}
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise PrintDeckInvalidResponseError("printer.endpoint is invalid")
+    return parsed.hostname, port
 
 
 def parse_snapshot(payload: Mapping[str, Any]) -> tuple[PrintDeckPrinter, ...]:

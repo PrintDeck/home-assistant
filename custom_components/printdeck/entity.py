@@ -9,6 +9,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .api import PrintDeckPrinter
 from .const import DOMAIN
 from .coordinator import PrintDeckCoordinator
+from .identity import printer_device_identifier, printer_entity_unique_id
 
 
 class PrintDeckEntity(CoordinatorEntity[PrintDeckCoordinator]):
@@ -25,8 +26,8 @@ class PrintDeckEntity(CoordinatorEntity[PrintDeckCoordinator]):
         super().__init__(coordinator)
         self.entity_description = description
         self._printer_id = printer.printer_id
-        self._attr_unique_id = (
-            f"{coordinator.data.info.device_id}_{printer.printer_id}_{description.key}"
+        self._attr_unique_id = printer_entity_unique_id(
+            coordinator.data.info.device_id, printer.printer_id, description.key
         )
 
     @property
@@ -54,7 +55,9 @@ class PrintDeckEntity(CoordinatorEntity[PrintDeckCoordinator]):
         assert printer is not None
         info = self.coordinator.data.info
         return DeviceInfo(
-            identifiers={(DOMAIN, f"{info.device_id}:{printer.printer_id}")},
+            identifiers={
+                (DOMAIN, printer_device_identifier(info.device_id, printer.printer_id))
+            },
             name=printer.name,
             manufacturer=printer.manufacturer or "PrintDeck",
             model=printer.model or printer.protocol,
