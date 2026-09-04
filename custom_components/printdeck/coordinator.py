@@ -17,6 +17,7 @@ from .api import (
     PrintDeckApiError,
     PrintDeckAuthenticationError,
     PrintDeckInfo,
+    PrintDeckPower,
     PrintDeckPrinter,
     PrintDeckRateLimitedError,
     PrintDeckUnsupportedError,
@@ -32,6 +33,7 @@ class PrintDeckCoordinatorData:
     """Last complete snapshot received from PrintDeck."""
 
     info: PrintDeckInfo
+    power: PrintDeckPower
     printers: tuple[PrintDeckPrinter, ...]
 
 
@@ -63,7 +65,7 @@ class PrintDeckCoordinator(DataUpdateCoordinator[PrintDeckCoordinatorData]):
     async def _async_update_data(self) -> PrintDeckCoordinatorData:
         assert self.info is not None
         try:
-            printers = await self.client.async_get_snapshot()
+            snapshot = await self.client.async_get_snapshot()
         except PrintDeckAuthenticationError as err:
             raise ConfigEntryAuthFailed from err
         except PrintDeckRateLimitedError as err:
@@ -74,8 +76,10 @@ class PrintDeckCoordinator(DataUpdateCoordinator[PrintDeckCoordinatorData]):
             raise UpdateFailed("PrintDeck API is not supported") from err
         except PrintDeckApiError as err:
             raise UpdateFailed(str(err)) from err
-        self._async_remove_missing_printer_devices(printers)
-        return PrintDeckCoordinatorData(info=self.info, printers=printers)
+        self._async_remove_missing_printer_devices(snapshot.printers)
+        return PrintDeckCoordinatorData(
+            info=self.info, power=snapshot.power, printers=snapshot.printers
+        )
 
     def _async_remove_missing_printer_devices(
         self, printers: tuple[PrintDeckPrinter, ...]

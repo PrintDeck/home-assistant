@@ -59,10 +59,23 @@ class PrintDeckInfo:
     """Stable identity and software information for one PrintDeck."""
 
     device_id: str
+    name: str
     firmware_version: str
     hardware: str
     hostname: str | None
+    friendly_hostname: str | None
     snapshot_supported: bool
+
+
+@dataclass(frozen=True)
+class PrintDeckPower:
+    """Power state reported by one PrintDeck device."""
+
+    available: bool
+    battery_present: bool
+    battery_percent: float | None
+    charging: bool
+    external_power: bool
 
 
 @dataclass(frozen=True)
@@ -95,6 +108,14 @@ class PrintDeckPrinter:
     bed_current_c: float | None
     bed_target_c: float | None
     chamber_current_c: float | None
+
+
+@dataclass(frozen=True)
+class PrintDeckSnapshot:
+    """Complete dynamic state returned by one PrintDeck device."""
+
+    power: PrintDeckPower
+    printers: tuple[PrintDeckPrinter, ...]
 
 
 def _mapping(value: Any, field: str) -> Mapping[str, Any]:
@@ -158,10 +179,13 @@ def parse_info(payload: Mapping[str, Any]) -> PrintDeckInfo:
             "This PrintDeck firmware has no stable device ID"
         )
     device_id = device_id_value
+    suffix = device_id.removeprefix("printdeck-")[-6:].upper()
     network = _mapping(payload.get("network", {}), "network")
     capabilities = _mapping(payload.get("capabilities", {}), "capabilities")
     return PrintDeckInfo(
         device_id=device_id,
+        name=_string(payload.get("name"), "name", default=f"PrintDeck {suffix}")
+        or f"PrintDeck {suffix}",
         firmware_version=_string(
             payload.get("firmware_version"), "firmware_version", default="unknown"
         )
@@ -169,6 +193,11 @@ def parse_info(payload: Mapping[str, Any]) -> PrintDeckInfo:
         hardware=_string(payload.get("hardware"), "hardware", default="PrintDeck")
         or "PrintDeck",
         hostname=_string(network.get("hostname"), "network.hostname", nullable=True),
+        friendly_hostname=_string(
+            network.get("friendly_hostname"),
+            "network.friendly_hostname",
+            nullable=True,
+        ),
         snapshot_supported=_boolean(
             capabilities.get("snapshot"), "capabilities.snapshot", default=False
         ),
@@ -313,7 +342,39 @@ def _parse_printer_endpoint(endpoint: str, protocol: str) -> tuple[str, int]:
     return parsed.hostname, port
 
 
-def parse_snapshot(payload: Mapping[str, Any]) -> tuple[PrintDeckPrinter, ...]:
+def parse_power(payload: Mapping[str, Any]) -> PrintDeckPower:
+    """Validate the optional device power block in an aggregate snapshot."""
+    device = _mapping(payload.get("device", {}), "device")
+    power = _mapping(device.get("power", {}), "device.power")
+    available = _boolean(
+        power.get("available"), "device.power.available", default=False
+    )
+    battery_present = _boolean(
+        power.get("battery_present"), "device.power.battery_present", default=False
+    )
+    percent = _number(
+        power.get("battery_percent"), "device.power.battery_percent", nullable=True
+    )
+    return PrintDeckPower(
+        available=available,
+        battery_present=battery_present,
+        battery_percent=(
+            max(0.0, min(100.0, percent))
+            if available and battery_present and percent is not None
+            else None
+        ),
+        charging=_boolean(
+            power.get("charging"), "device.power.charging", default=False
+        ),
+        external_power=_boolean(
+            power.get("external_power"),
+            "device.power.external_power",
+            default=False,
+        ),
+    )
+
+
+def parse_snapshot(payload: Mapping[str, Any]) -> PrintDeckSnapshot:
     """Validate and normalize a complete snapshot response."""
     if payload.get("api_version") != API_VERSION:
         raise PrintDeckUnsupportedError("Unsupported PrintDeck API version")
@@ -324,7 +385,7 @@ def parse_snapshot(payload: Mapping[str, Any]) -> tuple[PrintDeckPrinter, ...]:
     for index, value in enumerate(values):
         item = _mapping(value, f"printers[{index}]")
         parsed.append(parse_printer(item.get("printer"), item.get("status")))
-    return tuple(parsed)
+    return PrintDeckSnapshot(power=parse_power(payload), printers=tuple(parsed))
 
 
 def parse_legacy_snapshot(
@@ -372,7 +433,7 @@ class PrintDeckApiClient:
         self._snapshot_supported = info.snapshot_supported
         return info
 
-    async def async_get_snapshot(self) -> tuple[PrintDeckPrinter, ...]:
+    async def async_get_snapshot(self) -> PrintDeckSnapshot:
         """Return all printer state using the fewest API requests available."""
         if self._snapshot_supported is not False:
             try:
@@ -384,7 +445,10 @@ class PrintDeckApiClient:
                 return snapshot
         printers = await self._async_request("/v1/printers")
         statuses = await self._async_request("/v1/printers/status")
-        return parse_legacy_snapshot(printers, statuses)
+        return PrintDeckSnapshot(
+            power=PrintDeckPower(False, False, None, False, False),
+            printers=parse_legacy_snapshot(printers, statuses),
+        )
 
     async def _async_request(self, path: str) -> Mapping[str, Any]:
         for attempt in range(2):

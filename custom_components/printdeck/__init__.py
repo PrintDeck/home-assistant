@@ -29,7 +29,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         identifiers={(DOMAIN, info.device_id)},
         manufacturer="PrintDeck",
         model=info.hardware,
-        name=entry.title,
+        name=info.name,
         sw_version=info.firmware_version,
         configuration_url=f"http://{entry.data[CONF_HOST]}",
     )

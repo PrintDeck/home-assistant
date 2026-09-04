@@ -4,7 +4,9 @@ The maintained Home Assistant integration for the local
 [PrintDeck Unified Printer API](https://printdeck.xyz/unified-printer-api/).
 It discovers PrintDeck devices over mDNS, asks for the API token in the Home
 Assistant interface and creates devices and entities for every configured
-printer. Printers removed from PrintDeck are removed from Home Assistant after
+printer. Battery-equipped PrintDeck models also expose battery level and
+charging sensors, so automations can react to a low battery. Printers removed
+from PrintDeck are removed from Home Assistant after
 the next successful refresh. Every printer also exposes diagnostic network
 address and network port sensors; its Home Assistant identity remains stable
 when the endpoint or display name changes.

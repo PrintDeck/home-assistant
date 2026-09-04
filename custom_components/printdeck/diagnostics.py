@@ -25,6 +25,10 @@ async def async_get_config_entry_diagnostics(
             "firmware_version": data.info.firmware_version,
             "hardware": data.info.hardware,
             "snapshot_supported": data.info.snapshot_supported,
+            "power_available": data.power.available,
+            "battery_present": data.power.battery_present,
+            "battery_percent": data.power.battery_percent,
+            "charging": data.power.charging,
         },
         "last_update_success": coordinator.last_update_success,
         "printers": [

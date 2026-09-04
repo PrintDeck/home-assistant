@@ -116,8 +116,7 @@ class PrintDeckConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     self._get_reconfigure_entry(), data_updates=data
                 )
             self._abort_if_unique_id_configured(updates={CONF_HOST: host})
-            suffix = info.device_id.removeprefix("printdeck-")[-6:].upper()
-            return self.async_create_entry(title=f"PrintDeck {suffix}", data=data)
+            return self.async_create_entry(title=info.name, data=data)
 
         return self.async_show_form(
             step_id="reconfigure" if reconfigure else "user",
@@ -151,7 +150,9 @@ class PrintDeckConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._abort_if_unique_id_configured(updates={CONF_HOST: discovery_info.host})
         self._discovered_host = discovery_info.host.rstrip(".")
         suffix = device_id.removeprefix("printdeck-")[-6:].upper()
-        self.context["title_placeholders"] = {"name": f"PrintDeck {suffix}"}
+        self.context["title_placeholders"] = {
+            "name": discovery_info.properties.get("name") or f"PrintDeck {suffix}"
+        }
         self.context["configuration_url"] = f"http://{self._discovered_host}"
         return await self.async_step_zeroconf_confirm()
 

@@ -22,7 +22,7 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .api import PrintDeckPrinter
+from .api import PrintDeckPower, PrintDeckPrinter
 from .const import (
     ACTIVITY_OPTIONS,
     CONNECTION_OPTIONS,
@@ -32,7 +32,7 @@ from .const import (
     REACHABILITY_OPTIONS,
 )
 from .coordinator import PrintDeckCoordinator
-from .entity import PrintDeckEntity
+from .entity import PrintDeckDeviceEntity, PrintDeckEntity
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -43,6 +43,26 @@ class PrintDeckSensorEntityDescription(SensorEntityDescription):
     available_when_stale: bool = False
     requires_full_detail: bool = False
     none_is_unavailable: bool = False
+
+
+@dataclass(frozen=True, kw_only=True)
+class PrintDeckDeviceSensorEntityDescription(SensorEntityDescription):
+    """Describe a sensor belonging to the PrintDeck device."""
+
+    value_fn: Callable[[PrintDeckPower], Any]
+
+
+DEVICE_SENSORS: tuple[PrintDeckDeviceSensorEntityDescription, ...] = (
+    PrintDeckDeviceSensorEntityDescription(
+        key="battery_level",
+        translation_key="battery_level",
+        device_class=SensorDeviceClass.BATTERY,
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=0,
+        value_fn=lambda power: power.battery_percent,
+    ),
+)
 
 
 SENSORS: tuple[PrintDeckSensorEntityDescription, ...] = (
@@ -230,6 +250,20 @@ async def async_setup_entry(
     """Set up PrintDeck sensors and discover newly added printer profiles."""
     coordinator: PrintDeckCoordinator = entry.runtime_data
     known_printers: set[str] = set()
+    power_entities_added = False
+
+    @callback
+    def async_add_device_power() -> None:
+        nonlocal power_entities_added
+        if power_entities_added or not coordinator.data.power.available:
+            return
+        power_entities_added = True
+        async_add_entities(
+            [
+                PrintDeckDeviceSensor(coordinator, description)
+                for description in DEVICE_SENSORS
+            ]
+        )
 
     @callback
     def async_add_new_printers() -> None:
@@ -249,7 +283,9 @@ async def async_setup_entry(
         if entities:
             async_add_entities(entities)
 
+    async_add_device_power()
     async_add_new_printers()
+    entry.async_on_unload(coordinator.async_add_listener(async_add_device_power))
     entry.async_on_unload(coordinator.async_add_listener(async_add_new_printers))
 
 
@@ -279,3 +315,25 @@ class PrintDeckSensor(PrintDeckEntity, SensorEntity):
         """Return the current value without performing I/O."""
         printer = self.printer
         return None if printer is None else self.entity_description.value_fn(printer)
+
+
+class PrintDeckDeviceSensor(PrintDeckDeviceEntity, SensorEntity):
+    """One power measurement from the PrintDeck device."""
+
+    entity_description: PrintDeckDeviceSensorEntityDescription
+
+    @property
+    def available(self) -> bool:
+        """Return whether a battery measurement is available."""
+        power = self.coordinator.data.power
+        return (
+            super().available
+            and power.available
+            and power.battery_present
+            and power.battery_percent is not None
+        )
+
+    @property
+    def native_value(self) -> Any:
+        """Return the current value without performing I/O."""
+        return self.entity_description.value_fn(self.coordinator.data.power)

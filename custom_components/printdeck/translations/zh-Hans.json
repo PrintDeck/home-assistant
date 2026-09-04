@@ -11,8 +11,8 @@
     "abort": {"already_configured": "此 PrintDeck 已配置。", "invalid_discovery": "发现的服务未包含有效的 PrintDeck 身份信息。", "reauth_successful": "PrintDeck 令牌已更新。", "reconfigure_successful": "PrintDeck 已重新配置。"}
   },
   "entity": {
-    "binary_sensor": {"online": {"name": "连接"}, "selected": {"name": "已选打印机"}, "data_stale": {"name": "过期数据"}},
-    "sensor": {
+    "binary_sensor": {"battery_charging": {"name": "电池充电"}, "online": {"name": "连接"}, "selected": {"name": "已选打印机"}, "data_stale": {"name": "过期数据"}},
+    "sensor": {"battery_level": {"name": "电池电量"},
       "phase": {"name": "打印阶段", "state": {"unknown": "未知", "idle": "空闲", "preparing": "准备中", "printing": "打印中", "paused": "已暂停", "completed": "已完成", "failed": "失败", "cancelled": "已取消"}},
       "activity": {"name": "打印机活动", "state": {"unknown": "未知", "standby": "待机", "preparing": "准备中", "nozzle_heating": "喷嘴加热中", "bed_heating": "热床加热中", "homing": "归位中", "bed_leveling": "热床调平中", "nozzle_cleaning": "喷嘴清洁中", "calibrating": "校准中", "filament_changing": "换料中", "filament_unloading": "退料中", "filament_loading": "进料中", "filament_purging": "冲洗耗材中", "printing": "打印中", "paused": "已暂停", "completed": "已完成", "failed": "失败", "cancelled": "已取消"}},
       "progress": {"name": "打印进度"}, "job_name": {"name": "打印名称"}, "job_kind": {"name": "任务类型", "state": {"print": "打印", "calibration": "校准"}}, "remaining_time": {"name": "剩余时间"}, "elapsed_time": {"name": "已用时间"}, "current_layer": {"name": "当前层"}, "total_layers": {"name": "总层数"}, "nozzle_temperature": {"name": "喷嘴温度"}, "nozzle_target_temperature": {"name": "喷嘴目标温度"}, "bed_temperature": {"name": "热床温度"}, "bed_target_temperature": {"name": "热床目标温度"}, "chamber_temperature": {"name": "腔体温度"}, "network_address": {"name": "网络地址"}, "network_port": {"name": "网络端口"},

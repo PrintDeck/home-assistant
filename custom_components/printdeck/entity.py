@@ -64,3 +64,33 @@ class PrintDeckEntity(CoordinatorEntity[PrintDeckCoordinator]):
             via_device=(DOMAIN, info.device_id),
             configuration_url=f"http://{self.coordinator.client.host}",
         )
+
+
+class PrintDeckDeviceEntity(CoordinatorEntity[PrintDeckCoordinator]):
+    """Base class for an entity belonging to the PrintDeck device itself."""
+
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        coordinator: PrintDeckCoordinator,
+        description: EntityDescription,
+    ) -> None:
+        super().__init__(coordinator)
+        self.entity_description = description
+        self._attr_unique_id = (
+            f"{coordinator.data.info.device_id}_{description.key}"
+        )
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Attach the entity to the integration's PrintDeck hub device."""
+        info = self.coordinator.data.info
+        return DeviceInfo(
+            identifiers={(DOMAIN, info.device_id)},
+            name=info.name,
+            manufacturer="PrintDeck",
+            model=info.hardware,
+            sw_version=info.firmware_version,
+            configuration_url=f"http://{self.coordinator.client.host}",
+        )

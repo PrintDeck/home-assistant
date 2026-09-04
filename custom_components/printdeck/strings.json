@@ -55,11 +55,13 @@
   },
   "entity": {
     "binary_sensor": {
+      "battery_charging": {"name": "Battery charging"},
       "online": {"name": "Connection"},
       "selected": {"name": "Selected printer"},
       "data_stale": {"name": "Stale data"}
     },
     "sensor": {
+      "battery_level": {"name": "Battery level"},
       "phase": {
         "name": "Print phase",
         "state": {

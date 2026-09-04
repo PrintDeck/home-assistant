@@ -89,8 +89,12 @@ def info_payload() -> dict[str, object]:
         "firmware_version": "1.2.3",
         "hardware": "amoled_1_75",
         "device_id": "printdeck-a1b2c3d4e5f6",
+        "name": "Workshop PrintDeck",
         "capabilities": {"snapshot": True, "home_assistant": True},
-        "network": {"hostname": "printdeck.local"},
+        "network": {
+            "hostname": "printdeck-a1b2c3.local",
+            "friendly_hostname": "printdeck-workshop.local",
+        },
         "read_only": True,
     }
 
@@ -152,6 +156,9 @@ class ParserTests(unittest.TestCase):
         payload = info_payload()
         parsed = API.parse_info(payload)
         self.assertEqual(parsed.device_id, "printdeck-a1b2c3d4e5f6")
+        self.assertEqual(parsed.name, "Workshop PrintDeck")
+        self.assertEqual(parsed.hostname, "printdeck-a1b2c3.local")
+        self.assertEqual(parsed.friendly_hostname, "printdeck-workshop.local")
         self.assertTrue(parsed.snapshot_supported)
 
         payload.pop("device_id")
@@ -161,7 +168,7 @@ class ParserTests(unittest.TestCase):
     def test_snapshot_preserves_measurements_and_identity(self) -> None:
         printer = API.parse_snapshot(
             {"api_version": "v1", "printers": [printer_payload()]}
-        )[0]
+        ).printers[0]
 
         self.assertEqual(printer.printer_id, "4278190081")
         self.assertEqual(printer.phase, "printing")
@@ -171,6 +178,28 @@ class ParserTests(unittest.TestCase):
         self.assertIsNone(printer.chamber_current_c)
         self.assertEqual(printer.network_address, "192.0.2.40")
         self.assertEqual(printer.network_port, 7125)
+
+    def test_snapshot_exposes_device_battery_and_charging_state(self) -> None:
+        snapshot = API.parse_snapshot(
+            {
+                "api_version": "v1",
+                "device": {
+                    "power": {
+                        "available": True,
+                        "battery_present": True,
+                        "battery_percent": 39,
+                        "charging": False,
+                        "external_power": False,
+                    }
+                },
+                "printers": [],
+            }
+        )
+
+        self.assertTrue(snapshot.power.available)
+        self.assertTrue(snapshot.power.battery_present)
+        self.assertEqual(snapshot.power.battery_percent, 39)
+        self.assertFalse(snapshot.power.charging)
 
     def test_bambu_endpoint_uses_the_local_mqtt_port(self) -> None:
         printer = API.parse_snapshot(
@@ -182,7 +211,7 @@ class ParserTests(unittest.TestCase):
                     )
                 ],
             }
-        )[0]
+        ).printers[0]
 
         self.assertEqual(printer.network_address, "printer-a1mini.local")
         self.assertEqual(printer.network_port, 8883)
@@ -202,7 +231,7 @@ class ParserTests(unittest.TestCase):
                         "api_version": "v1",
                         "printers": [printer_payload(endpoint=endpoint)],
                     }
-                )[0]
+                ).printers[0]
                 self.assertEqual(printer.network_address, "printer.local")
                 self.assertEqual(printer.network_port, expected_port)
 
@@ -222,13 +251,13 @@ class ParserTests(unittest.TestCase):
                 "api_version": "v1",
                 "printers": [printer_payload(endpoint="192.0.2.40:7125")],
             }
-        )[0]
+        ).printers[0]
         after = API.parse_snapshot(
             {
                 "api_version": "v1",
                 "printers": [printer_payload(endpoint="192.0.2.99:8125")],
             }
-        )[0]
+        ).printers[0]
 
         before_unique_id = IDENTITY.printer_entity_unique_id(
             "printdeck-a1b2c3d4e5f6", before.printer_id, "progress"
@@ -271,7 +300,7 @@ class ParserTests(unittest.TestCase):
                     "api_version": "v1",
                     "printers": [printer_payload(phase=phase)],
                 }
-            )[0]
+            ).printers[0]
             self.assertEqual(parsed.phase, phase)
 
         for activity in CONST.ACTIVITY_OPTIONS:
@@ -280,7 +309,7 @@ class ParserTests(unittest.TestCase):
                     "api_version": "v1",
                     "printers": [printer_payload(activity=activity)],
                 }
-            )[0]
+            ).printers[0]
             self.assertEqual(parsed.activity, activity)
 
     def test_snapshot_rejects_mismatched_printer_identity(self) -> None:
@@ -317,9 +346,9 @@ class ClientTests(unittest.IsolatedAsyncioTestCase):
         client = API.PrintDeckApiClient(session, "printdeck.local", "pd_secret")
 
         await client.async_get_info()
-        printers = await client.async_get_snapshot()
+        snapshot = await client.async_get_snapshot()
 
-        self.assertEqual(len(printers), 1)
+        self.assertEqual(len(snapshot.printers), 1)
         self.assertEqual(
             [request[0] for request in session.requests],
             [
@@ -340,9 +369,9 @@ class ClientTests(unittest.IsolatedAsyncioTestCase):
         )
         client = API.PrintDeckApiClient(session, "192.0.2.170", "pd_secret")
 
-        printers = await client.async_get_snapshot()
+        snapshot = await client.async_get_snapshot()
 
-        self.assertEqual(printers[0].phase, "printing")
+        self.assertEqual(snapshot.printers[0].phase, "printing")
         self.assertEqual(
             [request[0].rsplit("/", 1)[-1] for request in session.requests],
             ["snapshot", "printers", "status"],
