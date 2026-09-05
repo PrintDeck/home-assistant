@@ -43,9 +43,9 @@ Communication stays on the local network. Home Assistant polls PrintDeck's
 read-only API; printer credentials remain on PrintDeck. Do not expose the API
 port to the internet.
 
-This repository contains only the Home Assistant adapter, its automation
-blueprints, branding and tests. PrintDeck firmware and product sources remain in
-the separate [PrintDeck repository](https://github.com/PrintDeck/PrintDeck).
+This repository contains the Home Assistant integration, its automation
+blueprints, branding and tests. Learn more about PrintDeck, supported hardware
+and firmware installation at [printdeck.xyz](https://printdeck.xyz/).
 
 ## Development
 
