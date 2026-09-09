@@ -9,7 +9,12 @@ charging sensors, so automations can react to a low battery. Printers removed
 from PrintDeck are removed from Home Assistant after
 the next successful refresh. Every printer also exposes diagnostic network
 address and network port sensors; its Home Assistant identity remains stable
-when the endpoint or display name changes.
+when the endpoint or display name changes. Network diagnostic values come
+directly from the API's `printer.network` object. The integration displays its
+address text as supplied and does not interpret printer protocols or infer ports.
+Older firmware without this optional object leaves those two diagnostic values
+unknown while printer status continues to work. Home Assistant communicates
+only with PrintDeck and does not follow API redirects to another address.
 
 [![Open your Home Assistant instance and add this repository to HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=PrintDeck&repository=home-assistant&category=integration)
 

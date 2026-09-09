@@ -8,7 +8,6 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from time import monotonic
 from typing import Any
-from urllib.parse import urlsplit
 
 from aiohttp import ClientError, ClientSession
 
@@ -87,8 +86,8 @@ class PrintDeckPrinter:
     protocol: str
     manufacturer: str | None
     model: str | None
-    network_address: str
-    network_port: int
+    network_address: str | None
+    network_port: int | None
     selected: bool
     connection_state: str
     reachability: str
@@ -221,9 +220,7 @@ def parse_printer(printer_value: Any, status_value: Any) -> PrintDeckPrinter:
 
     protocol = _string(printer.get("protocol"), "printer.protocol", default="unknown")
     assert protocol is not None
-    network_address, network_port = _parse_printer_endpoint(
-        _string(printer.get("endpoint"), "printer.endpoint") or "", protocol
-    )
+    network_address, network_port = _parse_printer_network(printer.get("network"))
     progress = _number(
         job.get("progress_percent"), "status.job.progress_percent", default=0.0
     )
@@ -306,40 +303,16 @@ def parse_printer(printer_value: Any, status_value: Any) -> PrintDeckPrinter:
     )
 
 
-def _parse_printer_endpoint(endpoint: str, protocol: str) -> tuple[str, int]:
-    """Split a credential-free PrintDeck endpoint into an address and port."""
-    if not endpoint or any(character.isspace() for character in endpoint):
-        raise PrintDeckInvalidResponseError("printer.endpoint is invalid")
-    if protocol == "bambu_lan":
-        if "://" in endpoint or any(character in endpoint for character in "/@?#:"):
-            raise PrintDeckInvalidResponseError("printer.endpoint is invalid")
-        return endpoint, 8883
-    if protocol != "moonraker":
-        raise PrintDeckInvalidResponseError("printer.protocol is not supported")
-
-    has_explicit_scheme = "://" in endpoint
-    candidate = endpoint if has_explicit_scheme else f"http://{endpoint}"
-    try:
-        parsed = urlsplit(candidate)
-        if parsed.port is not None:
-            port = parsed.port
-        elif not has_explicit_scheme:
-            port = 7125
-        else:
-            port = 443 if parsed.scheme == "https" else 80
-    except ValueError as err:
-        raise PrintDeckInvalidResponseError("printer.endpoint is invalid") from err
-    if (
-        parsed.scheme not in {"http", "https"}
-        or not parsed.hostname
-        or parsed.username is not None
-        or parsed.password is not None
-        or parsed.path not in {"", "/"}
-        or parsed.query
-        or parsed.fragment
-    ):
-        raise PrintDeckInvalidResponseError("printer.endpoint is invalid")
-    return parsed.hostname, port
+def _parse_printer_network(value: Any) -> tuple[str | None, int | None]:
+    """Read optional diagnostics supplied by PrintDeck without interpreting them."""
+    if not isinstance(value, Mapping):
+        return None, None
+    address = value.get("address")
+    port = value.get("port")
+    return (
+        address if isinstance(address, str) else None,
+        port if isinstance(port, int) and not isinstance(port, bool) else None,
+    )
 
 
 def parse_power(payload: Mapping[str, Any]) -> PrintDeckPower:
@@ -473,6 +446,7 @@ class PrintDeckApiClient:
                     url,
                     headers={"Authorization": f"Bearer {self._token}"},
                     timeout=REQUEST_TIMEOUT_SECONDS,
+                    allow_redirects=False,
                 ) as response:
                     text = await response.text()
                     status = response.status
@@ -496,7 +470,7 @@ class PrintDeckApiClient:
                 except ValueError:
                     retry_seconds = 1.0
                 raise PrintDeckRateLimitedError(retry_seconds)
-            if status >= 400:
+            if status >= 300:
                 raise PrintDeckCannotConnectError(f"PrintDeck returned HTTP {status}")
             try:
                 payload = json.loads(text)

@@ -48,7 +48,10 @@ class FakeSession:
         self.responses = responses
         self.requests: list[tuple[str, dict[str, str], int]] = []
 
-    def get(self, url: str, *, headers: dict[str, str], timeout: int) -> FakeResponse:
+    def get(
+        self, url: str, *, headers: dict[str, str], timeout: int, allow_redirects: bool
+    ) -> FakeResponse:
+        assert allow_redirects is False
         self.requests.append((url, headers, timeout))
         return self.responses.pop(0)
 
@@ -107,6 +110,8 @@ def printer_payload(
     endpoint: str = "192.0.2.40:7125",
     phase: str = "printing",
     activity: str = "printing",
+    network_address: str = "192.0.2.40",
+    network_port: int = 7125,
 ) -> dict[str, object]:
     """Return one complete normalized printer item."""
     return {
@@ -115,6 +120,7 @@ def printer_payload(
             "name": name,
             "protocol": protocol,
             "endpoint": endpoint,
+            "network": {"address": network_address, "port": network_port},
             "manufacturer": "Voron",
             "model": "2.4",
             "selected": True,
@@ -147,6 +153,35 @@ def printer_payload(
             },
         },
     }
+
+
+def mixed_printer_payloads() -> list[dict[str, object]]:
+    """Use ordinary and future protocols with API-owned diagnostics."""
+    printers = []
+    for printer_id, (protocol, address, port) in enumerate(
+        (
+            ("moonraker", "192.0.2.40", 7125),
+            ("bambu_lan", "192.0.2.41", 8883),
+            ("prusalink", "192.0.2.42", 80),
+            ("elegoo_sdcp", "192.0.2.43", 3030),
+            ("elegoo_cc2", "192.0.2.44", 1883),
+            ("uniformation_sdcp", "192.0.2.45", 3030),
+            ("future_transport", "Tekst z API, nie adres IP.\nDruga linia.", 43210),
+        ),
+        start=1,
+    ):
+        item = printer_payload(
+            printer_id=printer_id, protocol=protocol, endpoint="opaque:legacy:value",
+            network_address=address, network_port=port,
+        )
+        if printer_id != 1:
+            item["printer"]["selected"] = False
+            item["status"]["connection"].update(
+                state="offline", reachability="offline", detail_level="summary", stale=True
+            )
+            item["status"]["temperatures"] = {}
+        printers.append(item)
+    return printers
 
 
 class ParserTests(unittest.TestCase):
@@ -201,39 +236,49 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(snapshot.power.battery_percent, 39)
         self.assertFalse(snapshot.power.charging)
 
-    def test_bambu_endpoint_uses_the_local_mqtt_port(self) -> None:
-        printer = API.parse_snapshot(
-            {
-                "api_version": "v1",
-                "printers": [
-                    printer_payload(
-                        protocol="bambu_lan", endpoint="printer-a1mini.local"
-                    )
-                ],
-            }
-        ).printers[0]
+    def test_network_diagnostics_are_used_exactly_as_supplied_by_the_api(self) -> None:
+        for protocol in ("bambu_lan", "moonraker", "future_transport", ""):
+            with self.subTest(protocol=protocol):
+                item = printer_payload(
+                    protocol=protocol, endpoint="http://ignored.local:1234",
+                    network_address="Dowolny tekst z API.\nDruga linia.",
+                    network_port=43210,
+                )
+                parsed = API.parse_printer(item["printer"], item["status"])
+                self.assertEqual(parsed.protocol, protocol)
+                self.assertEqual(parsed.network_address, "Dowolny tekst z API.\nDruga linia.")
+                self.assertEqual(parsed.network_port, 43210)
 
-        self.assertEqual(printer.network_address, "printer-a1mini.local")
-        self.assertEqual(printer.network_port, 8883)
+    def test_missing_network_metadata_does_not_require_firmware_update(self) -> None:
+        items = mixed_printer_payloads()
+        for item in items:
+            item["printer"].pop("network")
+        snapshot = API.parse_snapshot({"api_version": "v1", "printers": items})
+        self.assertEqual(len(snapshot.printers), len(items))
+        for printer in snapshot.printers:
+            self.assertIsNone(printer.network_address)
+            self.assertIsNone(printer.network_port)
+            self.assertEqual(printer.progress_percent, 52.5)
 
-    def test_moonraker_endpoint_reports_the_effective_port(self) -> None:
-        endpoints = {
-            "printer.local": 7125,
-            "http://printer.local": 80,
-            "https://printer.local": 443,
-            "https://printer.local:9443": 9443,
-        }
-
-        for endpoint, expected_port in endpoints.items():
-            with self.subTest(endpoint=endpoint):
-                printer = API.parse_snapshot(
-                    {
-                        "api_version": "v1",
-                        "printers": [printer_payload(endpoint=endpoint)],
-                    }
-                ).printers[0]
-                self.assertEqual(printer.network_address, "printer.local")
-                self.assertEqual(printer.network_port, expected_port)
+    def test_optional_network_metadata_does_not_block_printer_state(self) -> None:
+        for network, address, port in (
+            (None, None, None),
+            ({}, None, None),
+            ({"address": None, "port": None}, None, None),
+            ({"address": "API text", "port": None}, "API text", None),
+            ({"port": 43210}, None, 43210),
+            ({"address": 42, "port": True}, None, None),
+            ({"address": "API text", "port": "unavailable"}, "API text", None),
+            ([], None, None),
+        ):
+            with self.subTest(network=network):
+                item = printer_payload(protocol="future_transport")
+                item["printer"]["network"] = network
+                item["printer"].pop("endpoint")
+                parsed = API.parse_printer(item["printer"], item["status"])
+                self.assertEqual(parsed.network_address, address)
+                self.assertEqual(parsed.network_port, port)
+                self.assertEqual(parsed.progress_percent, 52.5)
 
     def test_identical_printer_names_keep_distinct_stable_identities(self) -> None:
         device_id = "printdeck-a1b2c3d4e5f6"
@@ -245,6 +290,27 @@ class ParserTests(unittest.TestCase):
 
         self.assertEqual(len(unique_ids), 10)
 
+    def test_mixed_protocols_preserve_all_printers_in_both_response_formats(self) -> None:
+        items = mixed_printer_payloads()
+        snapshot = API.parse_snapshot({"api_version": "v1", "printers": items})
+        legacy = API.parse_legacy_snapshot(
+            {"printers": [item["printer"] for item in items]},
+            {"statuses": [item["status"] for item in reversed(items)]},
+        )
+        self.assertEqual(snapshot.printers, legacy)
+        self.assertEqual(len(snapshot.printers), 7)
+        self.assertEqual(
+            [printer.network_port for printer in snapshot.printers],
+            [7125, 8883, 80, 3030, 1883, 3030, 43210],
+        )
+        self.assertEqual(snapshot.printers[0].progress_percent, 52.5)
+        for index, printer in enumerate(snapshot.printers, start=1):
+            self.assertEqual(printer.printer_id, str(index))
+            if index != 1:
+                self.assertFalse(printer.selected)
+                self.assertEqual(printer.connection_state, "offline")
+                self.assertIsNone(printer.nozzle_current_c)
+
     def test_endpoint_change_does_not_change_entity_identity(self) -> None:
         before = API.parse_snapshot(
             {
@@ -255,7 +321,7 @@ class ParserTests(unittest.TestCase):
         after = API.parse_snapshot(
             {
                 "api_version": "v1",
-                "printers": [printer_payload(endpoint="192.0.2.99:8125")],
+                "printers": [printer_payload(endpoint="192.0.2.99:8125", network_address="192.0.2.99", network_port=8125)],
             }
         ).printers[0]
 
@@ -339,7 +405,7 @@ class ClientTests(unittest.IsolatedAsyncioTestCase):
                 FakeResponse(200, info_payload()),
                 FakeResponse(
                     200,
-                    {"api_version": "v1", "printers": [printer_payload()]},
+                    {"api_version": "v1", "printers": mixed_printer_payloads()},
                 ),
             ]
         )
@@ -348,7 +414,7 @@ class ClientTests(unittest.IsolatedAsyncioTestCase):
         await client.async_get_info()
         snapshot = await client.async_get_snapshot()
 
-        self.assertEqual(len(snapshot.printers), 1)
+        self.assertEqual(len(snapshot.printers), 7)
         self.assertEqual(
             [request[0] for request in session.requests],
             [
@@ -357,6 +423,16 @@ class ClientTests(unittest.IsolatedAsyncioTestCase):
             ],
         )
         self.assertEqual(session.requests[0][1]["Authorization"], "Bearer pd_secret")
+
+    async def test_redirect_never_contacts_a_printer_or_another_host(self) -> None:
+        session = FakeSession([
+            FakeResponse(302, {}, {"Location": "http://printer.local/status"}),
+        ])
+        client = API.PrintDeckApiClient(session, "printdeck.local", "pd_secret")
+        with self.assertRaises(API.PrintDeckCannotConnectError):
+            await client.async_get_snapshot()
+        self.assertEqual(len(session.requests), 1)
+        self.assertEqual(session.requests[0][0], "http://printdeck.local/v1/snapshot")
 
     async def test_missing_snapshot_falls_back_to_legacy_endpoints(self) -> None:
         item = printer_payload()
