@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Mapping
 from typing import Any
@@ -9,8 +10,11 @@ from urllib.parse import urlsplit
 
 import voluptuous as vol
 from homeassistant import config_entries
-from homeassistant.config_entries import ConfigEntry, ConfigFlowResult
+from homeassistant.components import mqtt
+from homeassistant.config_entries import ConfigFlowResult
 from homeassistant.const import CONF_HOST
+from homeassistant.core import callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
     TextSelector,
@@ -29,7 +33,22 @@ from .api import (
     PrintDeckInvalidResponseError,
     PrintDeckUnsupportedError,
 )
-from .const import CONF_TOKEN, DEFAULT_HOST, DOMAIN
+from .const import (
+    CONF_TOKEN,
+    CONF_TOPIC_ROOT,
+    CONF_TRANSPORT,
+    DEFAULT_HOST,
+    DOMAIN,
+    TRANSPORT_HTTP,
+    TRANSPORT_MQTT,
+)
+from .mqtt_state import (
+    PrintDeckDiscoveryConflict,
+    decode_payload,
+    parse_mqtt_info,
+    validate_topic_root,
+)
+from .ownership import has_standard_mqtt_entities
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -75,6 +94,25 @@ class PrintDeckConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     def __init__(self) -> None:
         self._discovered_host: str | None = None
+        self._reconfiguring = False
+
+    def _abort_configured_http_host(self, device_id: str, host: str) -> None:
+        """Keep HTTP address discovery working without altering MQTT entries."""
+        existing = next(
+            (
+                entry
+                for entry in self._async_current_entries()
+                if entry.unique_id == device_id
+            ),
+            None,
+        )
+        updates = (
+            {CONF_HOST: host}
+            if existing is not None
+            and existing.data.get(CONF_TRANSPORT, TRANSPORT_HTTP) == TRANSPORT_HTTP
+            else None
+        )
+        self._abort_if_unique_id_configured(updates=updates)
 
     async def _async_validate(self, host: str, token: str) -> PrintDeckInfo:
         client = PrintDeckApiClient(async_get_clientsession(self.hass), host, token)
@@ -90,6 +128,10 @@ class PrintDeckConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if not host or not token:
                 raise ValueError
             info = await self._async_validate(host, token)
+            if has_standard_mqtt_entities(self.hass, info.device_id):
+                raise PrintDeckDiscoveryConflict("Standard MQTT entities still exist")
+        except PrintDeckDiscoveryConflict:
+            errors["base"] = "mqtt_discovery_conflict"
         except ValueError:
             errors["base"] = "invalid_input"
         except PrintDeckAuthenticationError:
@@ -109,17 +151,17 @@ class PrintDeckConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors["base"] = "unknown"
         else:
             await self.async_set_unique_id(info.device_id)
-            data = {CONF_HOST: host, CONF_TOKEN: token}
+            data = {CONF_HOST: host, CONF_TOKEN: token, CONF_TRANSPORT: TRANSPORT_HTTP}
             if reconfigure:
                 self._abort_if_unique_id_mismatch()
                 return self.async_update_reload_and_abort(
-                    self._get_reconfigure_entry(), data_updates=data
+                    self._get_reconfigure_entry(), data=data
                 )
-            self._abort_if_unique_id_configured(updates={CONF_HOST: host})
+            self._abort_configured_http_host(info.device_id, host)
             return self.async_create_entry(title=info.name, data=data)
 
         return self.async_show_form(
-            step_id="reconfigure" if reconfigure else "user",
+            step_id="http",
             data_schema=_data_schema(user_input),
             errors=errors,
             description_placeholders={
@@ -130,13 +172,105 @@ class PrintDeckConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Handle manually adding a PrintDeck."""
+        """Choose a transport without changing the PrintDeck entity identity."""
         if user_input is not None:
             return await self._async_entry_from_input(user_input)
+        return self.async_show_menu(step_id="user", menu_options=["http", "mqtt"])
+
+    async def async_step_http(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Configure the existing local HTTP API."""
+        if user_input is not None:
+            return await self._async_entry_from_input(
+                user_input, reconfigure=self._reconfiguring
+            )
+        defaults = (
+            dict(self._get_reconfigure_entry().data) if self._reconfiguring else {}
+        )
+        if self._discovered_host:
+            defaults[CONF_HOST] = self._discovered_host
         return self.async_show_form(
-            step_id="user",
-            data_schema=_data_schema(),
-            description_placeholders={"configuration_url": f"http://{DEFAULT_HOST}"},
+            step_id="http",
+            data_schema=_data_schema(defaults),
+            description_placeholders={
+                "configuration_url": f"http://{defaults.get(CONF_HOST, DEFAULT_HOST)}"
+            },
+        )
+
+    async def _async_mqtt_info(self, root: str) -> PrintDeckInfo:
+        """Read bounded retained identity using HA's own MQTT connection."""
+        if not await mqtt.async_wait_for_mqtt_client(self.hass):
+            raise PrintDeckCannotConnectError("MQTT is not configured")
+        future = self.hass.loop.create_future()
+
+        @callback
+        def received(message: mqtt.ReceiveMessage) -> None:
+            if future.done():
+                return
+            try:
+                info = parse_mqtt_info(root, decode_payload(message.payload))
+                if has_standard_mqtt_entities(self.hass, info.device_id):
+                    raise PrintDeckDiscoveryConflict(
+                        "Standard MQTT entities still exist"
+                    )
+            except (PrintDeckApiError, ValueError) as err:
+                future.set_exception(err)
+            else:
+                future.set_result(info)
+
+        unsubscribe = await mqtt.async_subscribe(
+            self.hass, f"{root}/info", received, qos=1
+        )
+        try:
+            async with asyncio.timeout(15):
+                return await future
+        finally:
+            unsubscribe()
+
+    async def async_step_mqtt(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Use an external broker already configured in Home Assistant."""
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            try:
+                root = validate_topic_root(user_input[CONF_TOPIC_ROOT])
+                info = await self._async_mqtt_info(root)
+            except PrintDeckDiscoveryConflict:
+                errors["base"] = "mqtt_discovery_conflict"
+            except (ValueError, KeyError):
+                errors["base"] = "invalid_topic_root"
+            except TimeoutError:
+                errors["base"] = "mqtt_no_device"
+            except (PrintDeckCannotConnectError, HomeAssistantError):
+                errors["base"] = "mqtt_not_ready"
+            except PrintDeckApiError:
+                errors["base"] = "invalid_response"
+            else:
+                await self.async_set_unique_id(info.device_id)
+                data = {CONF_TRANSPORT: TRANSPORT_MQTT, CONF_TOPIC_ROOT: root}
+                if self._reconfiguring:
+                    self._abort_if_unique_id_mismatch()
+                    return self.async_update_reload_and_abort(
+                        self._get_reconfigure_entry(), data=data
+                    )
+                self._abort_if_unique_id_configured()
+                return self.async_create_entry(title=info.name, data=data)
+        defaults = (
+            dict(self._get_reconfigure_entry().data) if self._reconfiguring else {}
+        )
+        defaults.update(user_input or {})
+        return self.async_show_form(
+            step_id="mqtt",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_TOPIC_ROOT, default=defaults.get(CONF_TOPIC_ROOT, "")
+                    ): TextSelector(TextSelectorConfig(type=TextSelectorType.TEXT))
+                }
+            ),
+            errors=errors,
         )
 
     async def async_step_zeroconf(
@@ -147,14 +281,14 @@ class PrintDeckConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if not device_id or not device_id.startswith("printdeck-"):
             return self.async_abort(reason="invalid_discovery")
         await self.async_set_unique_id(device_id)
-        self._abort_if_unique_id_configured(updates={CONF_HOST: discovery_info.host})
+        self._abort_configured_http_host(device_id, discovery_info.host)
         self._discovered_host = discovery_info.host.rstrip(".")
         suffix = device_id.removeprefix("printdeck-")[-6:].upper()
         self.context["title_placeholders"] = {
             "name": discovery_info.properties.get("name") or f"PrintDeck {suffix}"
         }
         self.context["configuration_url"] = f"http://{self._discovered_host}"
-        return await self.async_step_zeroconf_confirm()
+        return await self.async_step_user()
 
     async def async_step_zeroconf_confirm(
         self, user_input: dict[str, Any] | None = None
@@ -222,14 +356,8 @@ class PrintDeckConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Change the host or API token from the integration UI."""
-        entry: ConfigEntry = self._get_reconfigure_entry()
-        if user_input is not None:
-            return await self._async_entry_from_input(user_input, reconfigure=True)
-        return self.async_show_form(
-            step_id="reconfigure",
-            data_schema=_data_schema(entry.data),
-            description_placeholders={
-                "configuration_url": f"http://{entry.data[CONF_HOST]}"
-            },
+        """Change transport in place, preserving entities and automations."""
+        self._reconfiguring = True
+        return self.async_show_menu(
+            step_id="reconfigure", menu_options=["http", "mqtt"]
         )

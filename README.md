@@ -2,9 +2,9 @@
 
 The maintained Home Assistant integration for the local
 [PrintDeck Unified Printer API](https://printdeck.xyz/unified-printer-api/).
-It discovers PrintDeck devices over mDNS, asks for the API token in the Home
-Assistant interface and creates devices and entities for every configured
-printer. Battery-equipped PrintDeck models also expose battery level and
+It discovers PrintDeck devices over mDNS and offers a choice of HTTP API or
+MQTT through the broker configured in Home Assistant. Both transports create
+the same PrintDeck devices and entities for every configured printer. Battery-equipped PrintDeck models also expose battery level and
 charging sensors, so automations can react to a low battery. Printers removed
 from PrintDeck are removed from Home Assistant after
 the next successful refresh. Every printer also exposes diagnostic network
@@ -20,19 +20,104 @@ only with PrintDeck and does not follow API redirects to another address.
 
 ## Install
 
-1. Enable **Unified Printer API** in PrintDeck Web Config and copy its token.
+1. Choose the connection described below and configure it in PrintDeck Web Config.
 2. Open the HACS button above, or add
    `https://github.com/PrintDeck/home-assistant` as a custom repository of type
    **Integration**.
 3. Download **PrintDeck** in HACS and restart Home Assistant.
 4. Open **Settings > Devices & services > Add integration > PrintDeck**.
-5. Select a discovered PrintDeck, or enter `printdeck.local`, and paste the raw
-   API token. Do not add the `Bearer` prefix.
+5. Select **HTTP API** or **MQTT via Mosquitto** and follow the steps below.
 
 The integration requires PrintDeck firmware that advertises native Home
 Assistant support. See the
 [complete setup and migration guide](https://printdeck.xyz/unified-printer-api/home-assistant/)
 for supported entities and troubleshooting.
+
+## Choose a connection
+
+| Mode | Home Assistant setup | Entity integration |
+| --- | --- | --- |
+| HTTP API through HACS | Install PrintDeck; enter the local address and Unified API token | PrintDeck |
+| MQTT through HACS | Install PrintDeck; configure HA MQTT and enter the PrintDeck topic root | PrintDeck |
+| Automatic MQTT Discovery | Configure HA MQTT and enable automatic Discovery in PrintDeck; HACS is optional | MQTT |
+
+For **HTTP API**, enable Unified Printer API in PrintDeck Web Config, choose
+HTTP API when adding the integration, and enter its local address and raw token
+without the `Bearer` prefix. Existing installations continue to use HTTP.
+
+For **MQTT through HACS**:
+
+1. Install Mosquitto or use an existing local MQTT broker. Configure Home
+   Assistant's built-in MQTT integration to connect to it.
+2. Enable MQTT in PrintDeck Web Config and connect it to the same broker.
+   Broker credentials are separate from the Unified API token. Home Assistant
+   keeps its own broker credentials; the PrintDeck integration does not store
+   or request another copy.
+3. Keep **automatic Home Assistant Discovery** in PrintDeck disabled. If it was
+   enabled, wait for cleanup to finish and the standard MQTT entities to disappear
+   from Home Assistant before proceeding.
+4. Add PrintDeck, choose **MQTT via Mosquitto**, and copy the complete topic root
+   shown in PrintDeck, for example `printdeck/printdeck-a1b2c3d4e5f6/v1`.
+   This is a topic, not a broker address.
+
+For **automatic MQTT Discovery without HACS**, complete the first two MQTT steps
+and enable automatic Home Assistant Discovery in PrintDeck. Its devices and
+entities appear under Home Assistant's built-in MQTT integration. Do not add a
+second PrintDeck HACS integration for the same device. Both paths support the
+blueprints below; select the sensors belonging to the chosen path.
+
+### Change an existing connection
+
+Use **Reconfigure** on the existing PrintDeck integration to switch between
+HTTP and MQTT. Choose the same physical PrintDeck: the stable device and printer
+identifiers remain unchanged, so existing entities and automations remain attached.
+Switching to MQTT replaces the stored HTTP token and host with the MQTT topic root;
+switching back removes that topic root. The old transport is unloaded before the
+new one is set up.
+
+Standard MQTT Discovery and the HACS integration belong to different HA platforms.
+Moving between them does not automatically migrate entity IDs or automations.
+Choose one path per PrintDeck. Before moving from standard Discovery to HACS,
+disable automatic Discovery in PrintDeck, leave the old broker reachable until
+cleanup finishes, and wait until HA removes its MQTT entities. If the old broker
+is no longer reachable, remove its retained PrintDeck discovery entries and the
+corresponding obsolete HA MQTT entities manually. Before moving from HACS to
+standard Discovery, disable or remove the PrintDeck HACS entry first.
+
+Both HACS transports check HA's remaining standard MQTT entities before setup
+and during operation. The MQTT transport also checks the firmware's discovery
+and cleanup flags. If a conflict appears later, PrintDeck entities become
+unavailable and a repair notice explains how to resolve it. Disable or remove
+the HACS entry before deliberately moving to automatic Discovery.
+
+### MQTT state and recovery
+
+The MQTT transport uses Home Assistant's broker connection without opening direct
+printer sessions. It subscribes only to the selected PrintDeck namespace:
+
+- `/info`: retained device identity and discovery ownership.
+- `/printers`: retained complete profile catalog.
+- `/device`: live power state in `{ "api_version": "v1", "device": { "power": {} } }`.
+- `/printers/<id>/status`: live status in `{ "api_version": "v1", "status": {} }`.
+- `/availability`: `online` or `offline` with the device's last will.
+
+Firmware also publishes `/printers/<id>/nozzles` and `/materials` for other local
+consumers; the current HACS entity set uses the same status and power fields as
+HTTP. Telemetry is not retained. The integration waits for fresh power and status
+messages for the complete catalog, expires them after 90 seconds, and discards
+live state after an offline event or broker connection change. It retries initial
+setup when the device or broker is unavailable. No incomplete or malformed update
+removes printer devices. Up to ten profiles and 64 KiB per message are accepted;
+unknown topics and unconfigured printer IDs do not grow the cache. Catalog,
+power and status wrappers carry `_mqtt_generation`, an eight-digit hexadecimal
+boot/session nonce and eight-digit hexadecimal catalog counter separated by `-`.
+A changed catalog generation discards cached live state; only matching fresh
+status and power messages can restore entities. This prevents a retained catalog
+from being combined with telemetry for a different profile revision.
+
+Only the printer selected in PrintDeck has a full live connection. Other printers
+keep their existing summary polling cadence. Missing values remain unknown;
+`stale` and `summary` semantics are preserved in both transports.
 
 ## Automation blueprints
 
@@ -44,9 +129,11 @@ next to the English blueprints.
 
 ## Privacy and scope
 
-Communication stays on the local network. Home Assistant polls PrintDeck's
-read-only API; printer credentials remain on PrintDeck. Do not expose the API
-port to the internet.
+Communication stays on the local network. Home Assistant reads PrintDeck through
+HTTP or the configured MQTT broker; printer credentials remain on PrintDeck.
+Both paths are read-only. Keep the API and broker local, use broker authentication
+and validate certificates when using TLS. Grant MQTT read access only to trusted
+local consumers: telemetry can include printer names, job names and network metadata.
 
 This repository contains the Home Assistant integration, its automation
 blueprints, branding and tests. Learn more about PrintDeck, supported hardware

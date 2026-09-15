@@ -10,7 +10,7 @@ blueprint:
     print_phase:
       name: Capteur de phase d’impression
       description: Sélectionnez l’entité Phase d’impression de l’imprimante.
-      selector: {entity: {filter: [{integration: printdeck, domain: sensor, device_class: enum}]}}
+      selector: {entity: {filter: [{integration: printdeck, domain: sensor, device_class: enum}, {integration: mqtt, domain: sensor, device_class: enum}]}}
     light_target:
       name: Lumière
       description: Sélectionnez la lumière à allumer lorsque l’impression se termine.

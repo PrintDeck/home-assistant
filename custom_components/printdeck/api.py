@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import math
 from collections.abc import Mapping
 from dataclasses import dataclass
 from time import monotonic
@@ -97,11 +98,11 @@ class PrintDeckPrinter:
     activity: str
     job_kind: str
     job_name: str | None
-    progress_percent: float
-    elapsed_seconds: int
-    remaining_seconds: int
-    current_layer: int
-    total_layers: int
+    progress_percent: float | None
+    elapsed_seconds: int | None
+    remaining_seconds: int | None
+    current_layer: int | None
+    total_layers: int | None
     nozzle_current_c: float | None
     nozzle_target_c: float | None
     bed_current_c: float | None
@@ -152,6 +153,14 @@ def _number(
         return default
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise PrintDeckInvalidResponseError(f"{field} is not a number")
+    try:
+        finite = math.isfinite(value)
+    except OverflowError as err:
+        raise PrintDeckInvalidResponseError(
+            f"{field} exceeds the numeric range"
+        ) from err
+    if not finite:
+        raise PrintDeckInvalidResponseError(f"{field} is not finite")
     return float(value)
 
 
@@ -161,6 +170,11 @@ def _integer(value: Any, field: str, *, default: int = 0) -> int:
     if isinstance(value, bool) or not isinstance(value, int):
         raise PrintDeckInvalidResponseError(f"{field} is not an integer")
     return value
+
+
+def _optional_count(value: Any, field: str) -> int | None:
+    """Preserve unknown telemetry instead of inventing zero."""
+    return None if value is None else max(0, _integer(value, field))
 
 
 def parse_info(payload: Mapping[str, Any]) -> PrintDeckInfo:
@@ -222,9 +236,8 @@ def parse_printer(printer_value: Any, status_value: Any) -> PrintDeckPrinter:
     assert protocol is not None
     network_address, network_port = _parse_printer_network(printer.get("network"))
     progress = _number(
-        job.get("progress_percent"), "status.job.progress_percent", default=0.0
+        job.get("progress_percent"), "status.job.progress_percent", nullable=True
     )
-    assert progress is not None
     return PrintDeckPrinter(
         printer_id=str(printer_id),
         name=_string(printer.get("name"), "printer.name") or f"Printer {printer_id}",
@@ -262,18 +275,18 @@ def parse_printer(printer_value: Any, status_value: Any) -> PrintDeckPrinter:
         job_kind=_string(job.get("kind"), "status.job.kind", default="print")
         or "print",
         job_name=_string(job.get("name"), "status.job.name", nullable=True),
-        progress_percent=max(0.0, min(100.0, progress)),
-        elapsed_seconds=max(
-            0, _integer(job.get("elapsed_seconds"), "status.job.elapsed_seconds")
+        progress_percent=(None if progress is None else max(0.0, min(100.0, progress))),
+        elapsed_seconds=_optional_count(
+            job.get("elapsed_seconds"), "status.job.elapsed_seconds"
         ),
-        remaining_seconds=max(
-            0, _integer(job.get("remaining_seconds"), "status.job.remaining_seconds")
+        remaining_seconds=_optional_count(
+            job.get("remaining_seconds"), "status.job.remaining_seconds"
         ),
-        current_layer=max(
-            0, _integer(job.get("current_layer"), "status.job.current_layer")
+        current_layer=_optional_count(
+            job.get("current_layer"), "status.job.current_layer"
         ),
-        total_layers=max(
-            0, _integer(job.get("total_layers"), "status.job.total_layers")
+        total_layers=_optional_count(
+            job.get("total_layers"), "status.job.total_layers"
         ),
         nozzle_current_c=_number(
             temperatures.get("nozzle_current_c"),

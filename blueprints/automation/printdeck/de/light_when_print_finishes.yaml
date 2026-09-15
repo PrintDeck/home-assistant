@@ -10,7 +10,7 @@ blueprint:
     print_phase:
       name: Druckphasen-Sensor
       description: Wähle die Entität Druckphase des Druckers.
-      selector: {entity: {filter: [{integration: printdeck, domain: sensor, device_class: enum}]}}
+      selector: {entity: {filter: [{integration: printdeck, domain: sensor, device_class: enum}, {integration: mqtt, domain: sensor, device_class: enum}]}}
     light_target:
       name: Licht
       description: Wähle das Licht, das nach Druckabschluss eingeschaltet wird.

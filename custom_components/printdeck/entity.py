@@ -62,7 +62,7 @@ class PrintDeckEntity(CoordinatorEntity[PrintDeckCoordinator]):
             manufacturer=printer.manufacturer or "PrintDeck",
             model=printer.model or printer.protocol,
             via_device=(DOMAIN, info.device_id),
-            configuration_url=f"http://{self.coordinator.client.host}",
+            configuration_url=self.coordinator.configuration_url,
         )
 
 
@@ -78,9 +78,7 @@ class PrintDeckDeviceEntity(CoordinatorEntity[PrintDeckCoordinator]):
     ) -> None:
         super().__init__(coordinator)
         self.entity_description = description
-        self._attr_unique_id = (
-            f"{coordinator.data.info.device_id}_{description.key}"
-        )
+        self._attr_unique_id = f"{coordinator.data.info.device_id}_{description.key}"
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -92,5 +90,5 @@ class PrintDeckDeviceEntity(CoordinatorEntity[PrintDeckCoordinator]):
             manufacturer="PrintDeck",
             model=info.hardware,
             sw_version=info.firmware_version,
-            configuration_url=f"http://{self.coordinator.client.host}",
+            configuration_url=self.coordinator.configuration_url,
         )

@@ -55,3 +55,8 @@ CONNECTION_OPTIONS = [
 REACHABILITY_OPTIONS = ["unknown", "online", "offline"]
 DETAIL_LEVEL_OPTIONS = ["summary", "full"]
 JOB_KIND_OPTIONS = ["print", "calibration"]
+
+CONF_TRANSPORT = "transport"
+CONF_TOPIC_ROOT = "topic_root"
+TRANSPORT_HTTP = "http"
+TRANSPORT_MQTT = "mqtt"

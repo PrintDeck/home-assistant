@@ -16,6 +16,8 @@ blueprint:
           filter:
             - integration: printdeck
               domain: sensor
+            - integration: mqtt
+              domain: sensor
               device_class: enum
     light_target:
       name: Światło

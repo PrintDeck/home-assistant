@@ -2,21 +2,212 @@
   "title": "PrintDeck",
   "config": {
     "step": {
-      "user": {"title": "Mit PrintDeck verbinden", "description": "Aktiviere die Unified Printer API in [PrintDeck Web Config]({configuration_url}) und gib dann den lokalen Host und das API-Token ein.", "data": {"host": "Host oder IP-Adresse", "token": "Unified-API-Token"}, "data_description": {"host": "Zum Beispiel printdeck.local oder die von PrintDeck angezeigte lokale IP-Adresse.", "token": "Das Token unter Einstellungen > Unified API in PrintDeck Web Config."}},
-      "zeroconf_confirm": {"title": "Erkanntes PrintDeck hinzufügen", "description": "{name} wurde unter `{host}` gefunden. Aktiviere die Unified Printer API in [PrintDeck Web Config]({configuration_url}) und gib das Token ein.", "data": {"token": "Unified-API-Token"}},
-      "reauth_confirm": {"title": "PrintDeck-Token aktualisieren", "description": "Das aktuelle Unified-API-Token wurde abgelehnt. Gib das aktive Token aus PrintDeck Web Config ein.", "data": {"token": "Unified-API-Token"}},
-      "reconfigure": {"title": "PrintDeck neu konfigurieren", "description": "Ändere die lokale Adresse oder das Token. Du kannst beides in [PrintDeck Web Config]({configuration_url}) prüfen.", "data": {"host": "Host oder IP-Adresse", "token": "Unified-API-Token"}}
+      "user": {
+        "title": "Verbindung auswählen",
+        "description": "Wähle die HTTP-API oder MQTT über den in Home Assistant eingerichteten Broker.",
+        "menu_options": {
+          "http": "HTTP-API",
+          "mqtt": "MQTT über Mosquitto"
+        }
+      },
+      "zeroconf_confirm": {
+        "title": "Erkanntes PrintDeck hinzufügen",
+        "description": "{name} wurde unter `{host}` gefunden. Aktiviere die Unified Printer API in [PrintDeck Web Config]({configuration_url}) und gib das Token ein.",
+        "data": {
+          "token": "Unified-API-Token"
+        }
+      },
+      "reauth_confirm": {
+        "title": "PrintDeck-Token aktualisieren",
+        "description": "Das aktuelle Unified-API-Token wurde abgelehnt. Gib das aktive Token aus PrintDeck Web Config ein.",
+        "data": {
+          "token": "Unified-API-Token"
+        }
+      },
+      "reconfigure": {
+        "title": "Verbindung auswählen",
+        "description": "Wähle die HTTP-API oder MQTT über den in Home Assistant eingerichteten Broker.",
+        "menu_options": {
+          "http": "HTTP-API",
+          "mqtt": "MQTT über Mosquitto"
+        }
+      },
+      "http": {
+        "title": "HTTP-API",
+        "description": "Aktiviere die Unified Printer API in [PrintDeck Web Config]({configuration_url}) und gib dann den lokalen Host und das API-Token ein.",
+        "data": {
+          "host": "Host oder IP-Adresse",
+          "token": "Unified-API-Token"
+        },
+        "data_description": {
+          "host": "Zum Beispiel printdeck.local oder die von PrintDeck angezeigte lokale IP-Adresse.",
+          "token": "Das Token unter Einstellungen > Unified API in PrintDeck Web Config."
+        }
+      },
+      "mqtt": {
+        "title": "Über MQTT verbinden",
+        "description": "Richte MQTT in Home Assistant und PrintDeck mit demselben Broker ein. Deaktiviere die automatische Home-Assistant-Erkennung in PrintDeck und warte, bis dessen MQTT-Entitäten entfernt wurden. Gib dann das von PrintDeck angezeigte Basisthema ein. Die PrintDeck-Integration verwaltet die Entitäten.",
+        "data": {
+          "topic_root": "PrintDeck-Basisthema"
+        },
+        "data_description": {
+          "topic_root": "Zum Beispiel: printdeck/printdeck-a1b2c3d4e5f6/v1. Gib nicht die Broker-Adresse ein."
+        }
+      }
     },
-    "error": {"cannot_connect": "Verbindung zu PrintDeck nicht möglich.", "invalid_auth": "Das Unified-API-Token ist ungültig.", "api_disabled": "Die Unified Printer API ist deaktiviert. Aktiviere sie in PrintDeck Web Config.", "unsupported_firmware": "Aktualisiere die PrintDeck-Firmware auf eine Version, die die Home-Assistant-Integration unterstützt.", "invalid_response": "PrintDeck hat eine ungültige Antwort zurückgegeben.", "invalid_input": "Gib einen gültigen lokalen Host und ein API-Token ein.", "unknown": "Ein unerwarteter Fehler ist aufgetreten."},
-    "abort": {"already_configured": "Dieses PrintDeck ist bereits konfiguriert.", "invalid_discovery": "Der erkannte Dienst enthält keine gültige PrintDeck-Identität.", "reauth_successful": "Das PrintDeck-Token wurde aktualisiert.", "reconfigure_successful": "PrintDeck wurde neu konfiguriert."}
+    "error": {
+      "cannot_connect": "Verbindung zu PrintDeck nicht möglich.",
+      "invalid_auth": "Das Unified-API-Token ist ungültig.",
+      "api_disabled": "Die Unified Printer API ist deaktiviert. Aktiviere sie in PrintDeck Web Config.",
+      "unsupported_firmware": "Aktualisiere die PrintDeck-Firmware auf eine Version, die die Home-Assistant-Integration unterstützt.",
+      "invalid_response": "PrintDeck hat eine ungültige Antwort zurückgegeben.",
+      "invalid_input": "Gib einen gültigen lokalen Host und ein API-Token ein.",
+      "unknown": "Ein unerwarteter Fehler ist aufgetreten.",
+      "mqtt_not_ready": "Richte zuerst die MQTT-Integration in Home Assistant ein und verbinde sie.",
+      "mqtt_no_device": "Keine PrintDeck-Identität empfangen. Prüfe Broker, Geräteverbindung und Basisthema.",
+      "invalid_topic_root": "Gib das vollständige von PrintDeck angezeigte Basisthema ein.",
+      "mqtt_discovery_conflict": "Deaktiviere die automatische Home-Assistant-Erkennung in PrintDeck, warte auf die Bereinigung und Entfernung der MQTT-Entitäten und versuche es erneut."
+    },
+    "abort": {
+      "already_configured": "Dieses PrintDeck ist bereits konfiguriert.",
+      "invalid_discovery": "Der erkannte Dienst enthält keine gültige PrintDeck-Identität.",
+      "reauth_successful": "Das PrintDeck-Token wurde aktualisiert.",
+      "reconfigure_successful": "PrintDeck wurde neu konfiguriert."
+    }
   },
   "entity": {
-    "binary_sensor": {"battery_charging": {"name": "Batterie wird geladen"}, "online": {"name": "Verbindung"}, "selected": {"name": "Ausgewählter Drucker"}, "data_stale": {"name": "Veraltete Daten"}},
-    "sensor": {"battery_level": {"name": "Batteriestand"},
-      "phase": {"name": "Druckphase", "state": {"unknown": "Unbekannt", "idle": "Bereit", "preparing": "Vorbereitung", "printing": "Druckt", "paused": "Pausiert", "completed": "Abgeschlossen", "failed": "Fehlgeschlagen", "cancelled": "Abgebrochen"}},
-      "activity": {"name": "Druckeraktivität", "state": {"unknown": "Unbekannt", "standby": "Bereitschaft", "preparing": "Vorbereitung", "nozzle_heating": "Düse wird aufgeheizt", "bed_heating": "Druckbett wird aufgeheizt", "homing": "Referenzfahrt", "bed_leveling": "Druckbett wird nivelliert", "nozzle_cleaning": "Düse wird gereinigt", "calibrating": "Kalibrierung", "filament_changing": "Filamentwechsel", "filament_unloading": "Filament wird entladen", "filament_loading": "Filament wird geladen", "filament_purging": "Filament wird gespült", "printing": "Druckt", "paused": "Pausiert", "completed": "Abgeschlossen", "failed": "Fehlgeschlagen", "cancelled": "Abgebrochen"}},
-      "progress": {"name": "Druckfortschritt"}, "job_name": {"name": "Druckname"}, "job_kind": {"name": "Auftragstyp", "state": {"print": "Druck", "calibration": "Kalibrierung"}}, "remaining_time": {"name": "Restzeit"}, "elapsed_time": {"name": "Verstrichene Zeit"}, "current_layer": {"name": "Aktuelle Schicht"}, "total_layers": {"name": "Gesamtschichten"}, "nozzle_temperature": {"name": "Düsentemperatur"}, "nozzle_target_temperature": {"name": "Düsen-Solltemperatur"}, "bed_temperature": {"name": "Druckbetttemperatur"}, "bed_target_temperature": {"name": "Druckbett-Solltemperatur"}, "chamber_temperature": {"name": "Kammertemperatur"}, "network_address": {"name": "Netzwerkadresse"}, "network_port": {"name": "Netzwerkport"},
-      "connection_state": {"name": "Verbindungsstatus", "state": {"unknown": "Unbekannt", "stopped": "Gestoppt", "waiting_for_network": "Wartet auf Netzwerk", "connecting": "Verbindung wird hergestellt", "online": "Online", "offline": "Offline"}}, "reachability": {"name": "Erreichbarkeit", "state": {"unknown": "Unbekannt", "online": "Online", "offline": "Offline"}}, "detail_level": {"name": "Datendetails", "state": {"summary": "Zusammenfassung", "full": "Vollständig"}}
+    "binary_sensor": {
+      "battery_charging": {
+        "name": "Batterie wird geladen"
+      },
+      "online": {
+        "name": "Verbindung"
+      },
+      "selected": {
+        "name": "Ausgewählter Drucker"
+      },
+      "data_stale": {
+        "name": "Veraltete Daten"
+      }
+    },
+    "sensor": {
+      "battery_level": {
+        "name": "Batteriestand"
+      },
+      "phase": {
+        "name": "Druckphase",
+        "state": {
+          "unknown": "Unbekannt",
+          "idle": "Bereit",
+          "preparing": "Vorbereitung",
+          "printing": "Druckt",
+          "paused": "Pausiert",
+          "completed": "Abgeschlossen",
+          "failed": "Fehlgeschlagen",
+          "cancelled": "Abgebrochen"
+        }
+      },
+      "activity": {
+        "name": "Druckeraktivität",
+        "state": {
+          "unknown": "Unbekannt",
+          "standby": "Bereitschaft",
+          "preparing": "Vorbereitung",
+          "nozzle_heating": "Düse wird aufgeheizt",
+          "bed_heating": "Druckbett wird aufgeheizt",
+          "homing": "Referenzfahrt",
+          "bed_leveling": "Druckbett wird nivelliert",
+          "nozzle_cleaning": "Düse wird gereinigt",
+          "calibrating": "Kalibrierung",
+          "filament_changing": "Filamentwechsel",
+          "filament_unloading": "Filament wird entladen",
+          "filament_loading": "Filament wird geladen",
+          "filament_purging": "Filament wird gespült",
+          "printing": "Druckt",
+          "paused": "Pausiert",
+          "completed": "Abgeschlossen",
+          "failed": "Fehlgeschlagen",
+          "cancelled": "Abgebrochen"
+        }
+      },
+      "progress": {
+        "name": "Druckfortschritt"
+      },
+      "job_name": {
+        "name": "Druckname"
+      },
+      "job_kind": {
+        "name": "Auftragstyp",
+        "state": {
+          "print": "Druck",
+          "calibration": "Kalibrierung"
+        }
+      },
+      "remaining_time": {
+        "name": "Restzeit"
+      },
+      "elapsed_time": {
+        "name": "Verstrichene Zeit"
+      },
+      "current_layer": {
+        "name": "Aktuelle Schicht"
+      },
+      "total_layers": {
+        "name": "Gesamtschichten"
+      },
+      "nozzle_temperature": {
+        "name": "Düsentemperatur"
+      },
+      "nozzle_target_temperature": {
+        "name": "Düsen-Solltemperatur"
+      },
+      "bed_temperature": {
+        "name": "Druckbetttemperatur"
+      },
+      "bed_target_temperature": {
+        "name": "Druckbett-Solltemperatur"
+      },
+      "chamber_temperature": {
+        "name": "Kammertemperatur"
+      },
+      "network_address": {
+        "name": "Netzwerkadresse"
+      },
+      "network_port": {
+        "name": "Netzwerkport"
+      },
+      "connection_state": {
+        "name": "Verbindungsstatus",
+        "state": {
+          "unknown": "Unbekannt",
+          "stopped": "Gestoppt",
+          "waiting_for_network": "Wartet auf Netzwerk",
+          "connecting": "Verbindung wird hergestellt",
+          "online": "Online",
+          "offline": "Offline"
+        }
+      },
+      "reachability": {
+        "name": "Erreichbarkeit",
+        "state": {
+          "unknown": "Unbekannt",
+          "online": "Online",
+          "offline": "Offline"
+        }
+      },
+      "detail_level": {
+        "name": "Datendetails",
+        "state": {
+          "summary": "Zusammenfassung",
+          "full": "Vollständig"
+        }
+      }
+    }
+  },
+  "issues": {
+    "mqtt_discovery_conflict": {
+      "title": "Verwaltung der PrintDeck-MQTT-Entitäten",
+      "description": "Die automatische MQTT-Erkennung von PrintDeck ist aktiviert, die Bereinigung steht aus oder es sind noch Standard-MQTT-Entitäten vorhanden. Deaktiviere die automatische Erkennung in PrintDeck Web Config und warte auf die Entfernung der bisherigen MQTT-Entitäten. Bis dahin bleiben die PrintDeck-Entitäten nicht verfügbar."
     }
   }
 }

@@ -2,21 +2,212 @@
   "title": "PrintDeck",
   "config": {
     "step": {
-      "user": {"title": "Connect to PrintDeck", "description": "Enable Unified Printer API in [PrintDeck Web Config]({configuration_url}), then enter the local host and API token.", "data": {"host": "Host or IP address", "token": "Unified API token"}, "data_description": {"host": "For example, printdeck.local or the local IP address shown by PrintDeck.", "token": "The token shown in Settings > Unified API in PrintDeck Web Config."}},
-      "zeroconf_confirm": {"title": "Add discovered PrintDeck", "description": "{name} was found at `{host}`. Enable Unified Printer API in [PrintDeck Web Config]({configuration_url}) and enter its token.", "data": {"token": "Unified API token"}},
-      "reauth_confirm": {"title": "Update the PrintDeck token", "description": "The current Unified API token was rejected. Enter the active token from PrintDeck Web Config.", "data": {"token": "Unified API token"}},
-      "reconfigure": {"title": "Reconfigure PrintDeck", "description": "Update the local address or token. You can check them in [PrintDeck Web Config]({configuration_url}).", "data": {"host": "Host or IP address", "token": "Unified API token"}}
+      "user": {
+        "title": "Choose a connection",
+        "description": "Choose HTTP API or MQTT through your existing Home Assistant broker.",
+        "menu_options": {
+          "http": "HTTP API",
+          "mqtt": "MQTT via Mosquitto"
+        }
+      },
+      "zeroconf_confirm": {
+        "title": "Add discovered PrintDeck",
+        "description": "{name} was found at `{host}`. Enable Unified Printer API in [PrintDeck Web Config]({configuration_url}) and enter its token.",
+        "data": {
+          "token": "Unified API token"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Update the PrintDeck token",
+        "description": "The current Unified API token was rejected. Enter the active token from PrintDeck Web Config.",
+        "data": {
+          "token": "Unified API token"
+        }
+      },
+      "reconfigure": {
+        "title": "Choose a connection",
+        "description": "Choose HTTP API or MQTT through your existing Home Assistant broker.",
+        "menu_options": {
+          "http": "HTTP API",
+          "mqtt": "MQTT via Mosquitto"
+        }
+      },
+      "http": {
+        "title": "HTTP API",
+        "description": "Enable Unified Printer API in [PrintDeck Web Config]({configuration_url}), then enter the local host and API token.",
+        "data": {
+          "host": "Host or IP address",
+          "token": "Unified API token"
+        },
+        "data_description": {
+          "host": "For example, printdeck.local or the local IP address shown by PrintDeck.",
+          "token": "The token shown in Settings > Unified API in PrintDeck Web Config."
+        }
+      },
+      "mqtt": {
+        "title": "Connect through MQTT",
+        "description": "Configure MQTT in Home Assistant and PrintDeck using the same broker. Disable automatic Home Assistant Discovery in PrintDeck and wait for its MQTT entities to disappear, then enter the topic root shown by PrintDeck. The PrintDeck integration will manage the entities.",
+        "data": {
+          "topic_root": "PrintDeck topic root"
+        },
+        "data_description": {
+          "topic_root": "For example: printdeck/printdeck-a1b2c3d4e5f6/v1. Do not enter the broker address."
+        }
+      }
     },
-    "error": {"cannot_connect": "Cannot connect to PrintDeck.", "invalid_auth": "The Unified API token is not valid.", "api_disabled": "Unified Printer API is disabled. Enable it in PrintDeck Web Config.", "unsupported_firmware": "Update PrintDeck firmware to a version that supports the Home Assistant integration.", "invalid_response": "PrintDeck returned an invalid response.", "invalid_input": "Enter a valid local host and API token.", "unknown": "An unexpected error occurred."},
-    "abort": {"already_configured": "This PrintDeck is already configured.", "invalid_discovery": "The discovered service did not include a valid PrintDeck identity.", "reauth_successful": "The PrintDeck token was updated.", "reconfigure_successful": "PrintDeck was reconfigured."}
+    "error": {
+      "cannot_connect": "Cannot connect to PrintDeck.",
+      "invalid_auth": "The Unified API token is not valid.",
+      "api_disabled": "Unified Printer API is disabled. Enable it in PrintDeck Web Config.",
+      "unsupported_firmware": "Update PrintDeck firmware to a version that supports the Home Assistant integration.",
+      "invalid_response": "PrintDeck returned an invalid response.",
+      "invalid_input": "Enter a valid local host and API token.",
+      "unknown": "An unexpected error occurred.",
+      "mqtt_not_ready": "Configure and connect the MQTT integration in Home Assistant first.",
+      "mqtt_no_device": "No PrintDeck identity received. Check the broker, device connection and topic root.",
+      "invalid_topic_root": "Enter the complete topic root shown by PrintDeck.",
+      "mqtt_discovery_conflict": "Disable automatic Home Assistant Discovery in PrintDeck, wait for cleanup and removal of its MQTT entities, then try again."
+    },
+    "abort": {
+      "already_configured": "This PrintDeck is already configured.",
+      "invalid_discovery": "The discovered service did not include a valid PrintDeck identity.",
+      "reauth_successful": "The PrintDeck token was updated.",
+      "reconfigure_successful": "PrintDeck was reconfigured."
+    }
   },
   "entity": {
-    "binary_sensor": {"battery_charging": {"name": "Battery charging"}, "online": {"name": "Connection"}, "selected": {"name": "Selected printer"}, "data_stale": {"name": "Stale data"}},
-    "sensor": {"battery_level": {"name": "Battery level"},
-      "phase": {"name": "Print phase", "state": {"unknown": "Unknown", "idle": "Idle", "preparing": "Preparing", "printing": "Printing", "paused": "Paused", "completed": "Completed", "failed": "Failed", "cancelled": "Cancelled"}},
-      "activity": {"name": "Printer activity", "state": {"unknown": "Unknown", "standby": "Standby", "preparing": "Preparing", "nozzle_heating": "Heating nozzle", "bed_heating": "Heating bed", "homing": "Homing", "bed_leveling": "Bed leveling", "nozzle_cleaning": "Cleaning nozzle", "calibrating": "Calibrating", "filament_changing": "Changing filament", "filament_unloading": "Unloading filament", "filament_loading": "Loading filament", "filament_purging": "Purging filament", "printing": "Printing", "paused": "Paused", "completed": "Completed", "failed": "Failed", "cancelled": "Cancelled"}},
-      "progress": {"name": "Print progress"}, "job_name": {"name": "Print name"}, "job_kind": {"name": "Job type", "state": {"print": "Print", "calibration": "Calibration"}}, "remaining_time": {"name": "Remaining time"}, "elapsed_time": {"name": "Elapsed time"}, "current_layer": {"name": "Current layer"}, "total_layers": {"name": "Total layers"}, "nozzle_temperature": {"name": "Nozzle temperature"}, "nozzle_target_temperature": {"name": "Nozzle target temperature"}, "bed_temperature": {"name": "Bed temperature"}, "bed_target_temperature": {"name": "Bed target temperature"}, "chamber_temperature": {"name": "Chamber temperature"}, "network_address": {"name": "Network address"}, "network_port": {"name": "Network port"},
-      "connection_state": {"name": "Connection state", "state": {"unknown": "Unknown", "stopped": "Stopped", "waiting_for_network": "Waiting for network", "connecting": "Connecting", "online": "Online", "offline": "Offline"}}, "reachability": {"name": "Reachability", "state": {"unknown": "Unknown", "online": "Online", "offline": "Offline"}}, "detail_level": {"name": "Data detail", "state": {"summary": "Summary", "full": "Full"}}
+    "binary_sensor": {
+      "battery_charging": {
+        "name": "Battery charging"
+      },
+      "online": {
+        "name": "Connection"
+      },
+      "selected": {
+        "name": "Selected printer"
+      },
+      "data_stale": {
+        "name": "Stale data"
+      }
+    },
+    "sensor": {
+      "battery_level": {
+        "name": "Battery level"
+      },
+      "phase": {
+        "name": "Print phase",
+        "state": {
+          "unknown": "Unknown",
+          "idle": "Idle",
+          "preparing": "Preparing",
+          "printing": "Printing",
+          "paused": "Paused",
+          "completed": "Completed",
+          "failed": "Failed",
+          "cancelled": "Cancelled"
+        }
+      },
+      "activity": {
+        "name": "Printer activity",
+        "state": {
+          "unknown": "Unknown",
+          "standby": "Standby",
+          "preparing": "Preparing",
+          "nozzle_heating": "Heating nozzle",
+          "bed_heating": "Heating bed",
+          "homing": "Homing",
+          "bed_leveling": "Bed leveling",
+          "nozzle_cleaning": "Cleaning nozzle",
+          "calibrating": "Calibrating",
+          "filament_changing": "Changing filament",
+          "filament_unloading": "Unloading filament",
+          "filament_loading": "Loading filament",
+          "filament_purging": "Purging filament",
+          "printing": "Printing",
+          "paused": "Paused",
+          "completed": "Completed",
+          "failed": "Failed",
+          "cancelled": "Cancelled"
+        }
+      },
+      "progress": {
+        "name": "Print progress"
+      },
+      "job_name": {
+        "name": "Print name"
+      },
+      "job_kind": {
+        "name": "Job type",
+        "state": {
+          "print": "Print",
+          "calibration": "Calibration"
+        }
+      },
+      "remaining_time": {
+        "name": "Remaining time"
+      },
+      "elapsed_time": {
+        "name": "Elapsed time"
+      },
+      "current_layer": {
+        "name": "Current layer"
+      },
+      "total_layers": {
+        "name": "Total layers"
+      },
+      "nozzle_temperature": {
+        "name": "Nozzle temperature"
+      },
+      "nozzle_target_temperature": {
+        "name": "Nozzle target temperature"
+      },
+      "bed_temperature": {
+        "name": "Bed temperature"
+      },
+      "bed_target_temperature": {
+        "name": "Bed target temperature"
+      },
+      "chamber_temperature": {
+        "name": "Chamber temperature"
+      },
+      "network_address": {
+        "name": "Network address"
+      },
+      "network_port": {
+        "name": "Network port"
+      },
+      "connection_state": {
+        "name": "Connection state",
+        "state": {
+          "unknown": "Unknown",
+          "stopped": "Stopped",
+          "waiting_for_network": "Waiting for network",
+          "connecting": "Connecting",
+          "online": "Online",
+          "offline": "Offline"
+        }
+      },
+      "reachability": {
+        "name": "Reachability",
+        "state": {
+          "unknown": "Unknown",
+          "online": "Online",
+          "offline": "Offline"
+        }
+      },
+      "detail_level": {
+        "name": "Data detail",
+        "state": {
+          "summary": "Summary",
+          "full": "Full"
+        }
+      }
+    }
+  },
+  "issues": {
+    "mqtt_discovery_conflict": {
+      "title": "PrintDeck MQTT entity ownership",
+      "description": "PrintDeck automatic MQTT Discovery is enabled, cleanup is pending, or standard MQTT entities still exist. Disable automatic Discovery in PrintDeck Web Config and wait for its old MQTT entities to be removed. PrintDeck entities remain unavailable until this is resolved."
     }
   }
 }

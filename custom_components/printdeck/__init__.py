@@ -9,17 +9,23 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import PrintDeckApiClient
-from .const import CONF_TOKEN, DOMAIN, PLATFORMS
+from .const import CONF_TOKEN, CONF_TRANSPORT, DOMAIN, PLATFORMS, TRANSPORT_MQTT
 from .coordinator import PrintDeckCoordinator
+from .mqtt_coordinator import PrintDeckMqttCoordinator
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up PrintDeck from a config entry."""
-    client = PrintDeckApiClient(
-        async_get_clientsession(hass), entry.data[CONF_HOST], entry.data[CONF_TOKEN]
-    )
-    coordinator = PrintDeckCoordinator(hass, entry, client)
-    await coordinator.async_config_entry_first_refresh()
+    if entry.data.get(CONF_TRANSPORT) == TRANSPORT_MQTT:
+        coordinator = PrintDeckMqttCoordinator(hass, entry)
+        await coordinator.async_start()
+        entry.async_on_unload(coordinator.async_stop)
+    else:
+        client = PrintDeckApiClient(
+            async_get_clientsession(hass), entry.data[CONF_HOST], entry.data[CONF_TOKEN]
+        )
+        coordinator = PrintDeckCoordinator(hass, entry, client)
+        await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
 
     info = coordinator.data.info
@@ -31,10 +37,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         model=info.hardware,
         name=info.name,
         sw_version=info.firmware_version,
-        configuration_url=f"http://{entry.data[CONF_HOST]}",
+        configuration_url=coordinator.configuration_url,
     )
 
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    try:
+        await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    except BaseException:
+        if isinstance(coordinator, PrintDeckMqttCoordinator):
+            coordinator.async_stop()
+        raise
     return True
 
 

@@ -19,7 +19,9 @@ async def async_get_config_entry_diagnostics(
     coordinator: PrintDeckCoordinator = entry.runtime_data
     data = coordinator.data
     return {
-        "entry": async_redact_data(dict(entry.data), {CONF_TOKEN, "host"}),
+        "entry": async_redact_data(
+            dict(entry.data), {CONF_TOKEN, "host", "topic_root"}
+        ),
         "device": {
             "device_id": data.info.device_id,
             "firmware_version": data.info.firmware_version,

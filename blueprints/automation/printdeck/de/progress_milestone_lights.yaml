@@ -10,7 +10,7 @@ blueprint:
     progress_sensor:
       name: Druckfortschritts-Sensor
       description: Wähle die Entität Druckfortschritt des Druckers.
-      selector: {entity: {filter: [{integration: printdeck, domain: sensor}]}}
+      selector: {entity: {filter: [{integration: printdeck, domain: sensor}, {integration: mqtt, domain: sensor}]}}
     light_25: {name: "Licht bei 25%", selector: {target: {entity: {domain: light}}}}
     light_50: {name: "Licht bei 50%", selector: {target: {entity: {domain: light}}}}
     light_75: {name: "Licht bei 75%", selector: {target: {entity: {domain: light}}}}

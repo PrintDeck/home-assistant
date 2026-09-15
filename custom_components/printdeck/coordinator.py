@@ -24,6 +24,7 @@ from .api import (
 )
 from .const import DEFAULT_UPDATE_INTERVAL, DOMAIN
 from .identity import device_belongs_to_missing_printer
+from .ownership import has_standard_mqtt_entities, update_discovery_issue
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -54,9 +55,25 @@ class PrintDeckCoordinator(DataUpdateCoordinator[PrintDeckCoordinatorData]):
         self.client = client
         self.info: PrintDeckInfo | None = None
 
+    @property
+    def configuration_url(self) -> str | None:
+        """Return the local configuration address for this transport."""
+        return f"http://{self.client.host}"
+
+    def _check_entity_ownership(self) -> None:
+        """Do not publish HTTP entities over an existing standard MQTT device."""
+        assert self.info is not None
+        conflict = has_standard_mqtt_entities(self.hass, self.info.device_id)
+        update_discovery_issue(self.hass, self.config_entry.entry_id, conflict)
+        if conflict:
+            raise UpdateFailed(
+                "Disable automatic MQTT Discovery and wait for its entities to be removed"
+            )
+
     async def _async_setup(self) -> None:
         try:
             self.info = await self.client.async_get_info()
+            self._check_entity_ownership()
         except PrintDeckAuthenticationError as err:
             raise ConfigEntryAuthFailed from err
         except PrintDeckApiError as err:
@@ -64,6 +81,7 @@ class PrintDeckCoordinator(DataUpdateCoordinator[PrintDeckCoordinatorData]):
 
     async def _async_update_data(self) -> PrintDeckCoordinatorData:
         assert self.info is not None
+        self._check_entity_ownership()
         try:
             snapshot = await self.client.async_get_snapshot()
         except PrintDeckAuthenticationError as err:

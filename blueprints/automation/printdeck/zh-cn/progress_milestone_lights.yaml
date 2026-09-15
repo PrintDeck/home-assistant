@@ -9,7 +9,7 @@ blueprint:
     progress_sensor:
       name: 打印进度传感器
       description: 选择属于该打印机的打印进度实体。
-      selector: {entity: {filter: [{integration: printdeck, domain: sensor}]}}
+      selector: {entity: {filter: [{integration: printdeck, domain: sensor}, {integration: mqtt, domain: sensor}]}}
     light_25: {name: "25% 时的灯具", selector: {target: {entity: {domain: light}}}}
     light_50: {name: "50% 时的灯具", selector: {target: {entity: {domain: light}}}}
     light_75: {name: "75% 时的灯具", selector: {target: {entity: {domain: light}}}}

@@ -9,7 +9,7 @@ blueprint:
     print_phase:
       name: 打印阶段传感器
       description: 选择属于该打印机的打印阶段实体。
-      selector: {entity: {filter: [{integration: printdeck, domain: sensor, device_class: enum}]}}
+      selector: {entity: {filter: [{integration: printdeck, domain: sensor, device_class: enum}, {integration: mqtt, domain: sensor, device_class: enum}]}}
     light_target:
       name: 灯具
       description: 选择打印完成后要打开的灯具。
