@@ -46,13 +46,17 @@
       },
       "mqtt": {
         "title": "Über MQTT verbinden",
-        "description": "Richte MQTT in Home Assistant und PrintDeck mit demselben Broker ein. Deaktiviere die automatische Home-Assistant-Erkennung in PrintDeck und warte, bis dessen MQTT-Entitäten entfernt wurden. Gib dann das von PrintDeck angezeigte Basisthema ein. Die PrintDeck-Integration verwaltet die Entitäten.",
+        "description": "**Verbindung vorbereiten**\n\n1. Verbinde Home Assistant und PrintDeck mit demselben MQTT-Broker (zum Beispiel Mosquitto).\n2. Deaktiviere in Web Config von PrintDeck → Geräteeinstellungen → Einheitliche API → MQTT die **Home Assistant MQTT-Erkennung** und speichere. Lass MQTT aktiviert, während alte Discovery-Einträge entfernt werden.\n3. Kopiere den **MQTT-Themenwurzel** vom Anfang dieses MQTT-Bereichs in das Feld unten.\n\nDie PrintDeck-Integration verwaltet deine Sensoren und Druckereignisse. Wenn du PrintDeck über die von Home Assistant entdeckten Geräte hinzufügst, wird das Thema automatisch ermittelt.",
         "data": {
           "topic_root": "PrintDeck-Basisthema"
         },
         "data_description": {
-          "topic_root": "Zum Beispiel: printdeck/printdeck-a1b2c3d4e5f6/v1. Gib nicht die Broker-Adresse ein."
+          "topic_root": "Kopiere den vollständigen MQTT-Themenwurzel aus Web Config von PrintDeck → Geräteeinstellungen → Einheitliche API → MQTT. Beispielformat: printdeck/printdeck-a1b2c3d4e5f6/v1. Verwende den Wert deines Geräts, nicht die Broker-Adresse."
         }
+      },
+      "mqtt_auto": {
+        "title": "MQTT-Verbindung abschließen",
+        "description": "Das MQTT-Thema dieses PrintDeck ist bereits bekannt. Du musst es nicht eingeben.\n\n**Diese Einstellungen prüfen**\n\n1. Verbinde Home Assistant und PrintDeck mit demselben MQTT-Broker.\n2. Lass in Web Config von PrintDeck → Geräteeinstellungen → Einheitliche API → MQTT die **MQTT-Verbindung** aktiviert, deaktiviere die **Home Assistant MQTT-Erkennung** und speichere.\n3. Falls Discovery aktiviert war, halte den Broker verbunden, bis dessen alte MQTT-Entitäten aus Home Assistant verschwunden sind.\n\nWähle anschließend **Absenden (Submit)**, um es erneut zu versuchen. Die PrintDeck-Integration verwaltet deine Sensoren und Druckereignisse."
       }
     },
     "error": {
@@ -64,9 +68,9 @@
       "invalid_input": "Gib einen gültigen lokalen Host und ein API-Token ein.",
       "unknown": "Ein unerwarteter Fehler ist aufgetreten.",
       "mqtt_not_ready": "Richte zuerst die MQTT-Integration in Home Assistant ein und verbinde sie.",
-      "mqtt_no_device": "Keine PrintDeck-Identität empfangen. Prüfe Broker, Geräteverbindung und Basisthema.",
+      "mqtt_no_device": "Keine PrintDeck-Identität über MQTT empfangen. Prüfe, ob PrintDeck online und mit demselben Broker wie Home Assistant verbunden ist.",
       "invalid_topic_root": "Gib das vollständige von PrintDeck angezeigte Basisthema ein.",
-      "mqtt_discovery_conflict": "Deaktiviere die automatische Home-Assistant-Erkennung in PrintDeck, warte auf die Bereinigung und Entfernung der MQTT-Entitäten und versuche es erneut."
+      "mqtt_discovery_conflict": "Deaktiviere Home Assistant MQTT-Erkennung in Web Config dieses PrintDeck → Geräteeinstellungen → Einheitliche API → MQTT und speichere. Halte den Broker bis zum Ende der Bereinigung verbunden. Falls die Einrichtung weiter blockiert ist, prüfe die verbleibenden MQTT-Entitäten dieses PrintDeck unter Home Assistant → Einstellungen → Geräte & Dienste → Entitäten."
     },
     "abort": {
       "already_configured": "Dieses PrintDeck ist bereits konfiguriert.",
@@ -237,8 +241,8 @@
   },
   "issues": {
     "mqtt_discovery_conflict": {
-      "title": "Verwaltung der PrintDeck-MQTT-Entitäten",
-      "description": "Die automatische MQTT-Erkennung von PrintDeck ist aktiviert, die Bereinigung steht aus oder es sind noch Standard-MQTT-Entitäten vorhanden. Deaktiviere die automatische Erkennung in PrintDeck Web Config und warte auf die Entfernung der bisherigen MQTT-Entitäten. Bis dahin bleiben die PrintDeck-Entitäten nicht verfügbar."
+      "title": "PrintDeck: Konflikt mit MQTT-Entitäten beheben",
+      "description": "PrintDeck hat die HACS-Entitäten und Druckereignisse dieses Geräts angehalten, um Duplikate zu vermeiden. MQTT Discovery ist aktiviert, die Bereinigung steht noch aus oder Home Assistant enthält weiterhin MQTT-Entitäten dieses PrintDeck.\n\n**Wenn du PrintDeck über HACS verwendest**\n\n1. Öffne Web Config dieses PrintDeck → Geräteeinstellungen → Einheitliche API → MQTT.\n2. Setze **Home Assistant MQTT-Erkennung** auf **Deaktiviert (Disabled)** und wähle **MQTT-Einstellungen speichern**. Lass die MQTT-Verbindung aktiviert und denselben Broker während der Bereinigung erreichbar.\n3. Warte, bis die alten Discovery-Entitäten entfernt wurden. Deine HACS-Entitäten bleiben erhalten; der Konflikt verschwindet automatisch, sobald die Bereinigung abgeschlossen ist und Home Assistant den aktualisierten Status empfängt.\n\n**Bereits deaktiviert, aber die Warnung bleibt?** Prüfe die MQTT-Verbindung und den Bereinigungsstatus in diesem Bereich von Web Config. Filtere in Home Assistant → Einstellungen → Geräte & Dienste → Entitäten nach der Integration **MQTT** und prüfe die Entitäten dieses PrintDeck. Falls die automatische Bereinigung nicht abgeschlossen werden kann, entferne nur dessen veraltete, als retained gespeicherte Discovery-Konfiguration vom bisherigen Broker und dessen veraltete MQTT-Entitäten aus Home Assistant. Gespeicherte Konfiguration kann gelöschte Entitäten erneut anlegen.\n\n**Ignorieren (Ignore)** blendet nur die Warnung aus; die Entitäten bleiben gesperrt. Wenn du Standard-MQTT-Discovery bevorzugst, deaktiviere oder entferne stattdessen den Eintrag dieses Geräts in PrintDeck HACS. Die Auswahl gilt je PrintDeck; mehrere PrintDecks dürfen denselben Drucker überwachen."
     }
   }
 }

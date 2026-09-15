@@ -370,10 +370,94 @@ class LifecycleTests(unittest.IsolatedAsyncioTestCase):
         flow.configured_id = self.entry.unique_id
         with self.assertRaises(AbortFlow):
             await flow.async_step_mqtt({"topic_root": ROOT})
-        flow.entry = SimpleNamespace(unique_id="printdeck-other")
+        flow.entry = SimpleNamespace(unique_id="printdeck-other", data={})
         await flow.async_step_reconfigure()
         with self.assertRaises(AbortFlow):
             await flow.async_step_mqtt({"topic_root": ROOT})
+
+    async def discovered_flow(self):
+        flow = FLOW.PrintDeckConfigFlow()
+        flow.hass = self.hass
+        flow.context = {}
+        result = await flow.async_step_zeroconf(SimpleNamespace(
+            host="printdeck.local.", properties={"id": self.entry.unique_id}
+        ))
+        self.assertEqual(result["menu_options"], ["http", "mqtt"])
+        return flow
+
+    async def test_discovered_mqtt_connects_without_a_topic_form(self):
+        flow = await self.discovered_flow()
+        flow._async_mqtt_info = AsyncMock(return_value=API.parse_info(mqtt_info()))
+        result = await flow.async_step_mqtt()
+        flow._async_mqtt_info.assert_awaited_once_with(ROOT)
+        self.assertEqual(result["type"], "create_entry")
+        self.assertEqual(result["data"], {"transport": "mqtt", "topic_root": ROOT})
+
+    async def test_discovered_mqtt_failure_retries_without_asking_for_topic(self):
+        flow = await self.discovered_flow()
+        for error, expected in [
+            (FLOW.PrintDeckCannotConnectError(), "mqtt_not_ready"),
+            (TimeoutError(), "mqtt_no_device"),
+            (FLOW.PrintDeckDiscoveryConflict(), "mqtt_discovery_conflict"),
+        ]:
+            flow._async_mqtt_info = AsyncMock(side_effect=error)
+            result = await flow.async_step_mqtt()
+            self.assertEqual(result["step_id"], "mqtt_auto")
+            self.assertEqual(result["data_schema"], {})
+            self.assertEqual(result["errors"], {"base": expected})
+        flow._async_mqtt_info = AsyncMock(return_value=API.parse_info(mqtt_info()))
+        result = await flow.async_step_mqtt_auto({})
+        self.assertEqual(result["type"], "create_entry")
+        flow._async_mqtt_info.assert_awaited_once_with(ROOT)
+
+    async def test_http_reconfigure_automatically_uses_existing_identity(self):
+        flow = FLOW.PrintDeckConfigFlow()
+        flow.hass = self.hass
+        flow.entry = SimpleNamespace(
+            unique_id=self.entry.unique_id,
+            data={"host": "printdeck.local", "token": "test-token"},
+        )
+        flow._async_mqtt_info = AsyncMock(return_value=API.parse_info(mqtt_info()))
+        await flow.async_step_reconfigure()
+        result = await flow.async_step_mqtt()
+        flow._async_mqtt_info.assert_awaited_once_with(ROOT)
+        self.assertEqual(result["reason"], "reconfigure_successful")
+        self.assertEqual(result["data"], {"transport": "mqtt", "topic_root": ROOT})
+
+    async def test_manual_mqtt_keeps_field_and_preserves_input_on_error(self):
+        flow = FLOW.PrintDeckConfigFlow()
+        flow.hass = self.hass
+        flow._async_mqtt_info = AsyncMock(side_effect=TimeoutError())
+        with patch.object(FLOW.vol, "Required", return_value="topic_root") as required:
+            result = await flow.async_step_mqtt()
+            self.assertEqual(result["step_id"], "mqtt")
+            required.assert_called_with("topic_root", default="")
+            flow._async_mqtt_info.assert_not_awaited()
+            result = await flow.async_step_mqtt({"topic_root": ROOT})
+            self.assertEqual(result["step_id"], "mqtt")
+            self.assertEqual(result["errors"], {"base": "mqtt_no_device"})
+            required.assert_called_with("topic_root", default=ROOT)
+
+    async def test_discovered_mqtt_rejects_another_device_identity(self):
+        flow = await self.discovered_flow()
+        payload = mqtt_info()
+        payload["device_id"] = "printdeck-other"
+        flow._async_mqtt_info = AsyncMock(return_value=API.parse_info(payload))
+        result = await flow.async_step_mqtt()
+        self.assertEqual(result["step_id"], "mqtt_auto")
+        self.assertEqual(result["errors"], {"base": "invalid_response"})
+
+    async def test_invalid_discovery_cannot_supply_an_mqtt_subscription(self):
+        for identity in (None, 123, "printdeck-", "printdeck-+/v1", "printdeck-#", "other"):
+            flow = FLOW.PrintDeckConfigFlow()
+            flow.hass = self.hass
+            flow.context = {}
+            flow.async_abort = lambda **kwargs: kwargs
+            result = await flow.async_step_zeroconf(SimpleNamespace(
+                host="printdeck.local", properties={"id": identity}
+            ))
+            self.assertEqual(result["reason"], "invalid_discovery")
+            self.assertIsNone(flow._known_mqtt_root())
 
     async def test_manual_entity_refresh_reads_cache_without_http(self):
         coordinator, task = await self.start_pending()

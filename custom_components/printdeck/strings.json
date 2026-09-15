@@ -46,13 +46,17 @@
       },
       "mqtt": {
         "title": "Connect through MQTT",
-        "description": "Configure MQTT in Home Assistant and PrintDeck using the same broker. Disable automatic Home Assistant Discovery in PrintDeck and wait for its MQTT entities to disappear, then enter the topic root shown by PrintDeck. The PrintDeck integration will manage the entities.",
+        "description": "**Prepare the connection**\n\n1. Connect Home Assistant and PrintDeck to the same MQTT broker (for example, Mosquitto).\n2. In PrintDeck Web Config → Device Settings → Unified API → MQTT, set **Home Assistant MQTT Discovery** to **Disabled** and save. Keep MQTT enabled while old Discovery entries are removed.\n3. Copy **MQTT topic root** from the top of that MQTT section into the field below.\n\nThe PrintDeck integration will manage your sensors and print events. If you add a PrintDeck from Home Assistant's discovered devices, its topic is determined automatically.",
         "data": {
           "topic_root": "PrintDeck topic root"
         },
         "data_description": {
-          "topic_root": "For example: printdeck/printdeck-a1b2c3d4e5f6/v1. Do not enter the broker address."
+          "topic_root": "Copy the entire MQTT topic root from PrintDeck Web Config → Device Settings → Unified API → MQTT. Example format: printdeck/printdeck-a1b2c3d4e5f6/v1. Use your device’s value, not the broker address."
         }
+      },
+      "mqtt_auto": {
+        "title": "Finish the MQTT connection",
+        "description": "The MQTT topic for this PrintDeck is already known. You do not need to enter it.\n\n**Check these settings**\n\n1. Connect Home Assistant and PrintDeck to the same MQTT broker.\n2. In PrintDeck Web Config → Device Settings → Unified API → MQTT, keep **MQTT connection** enabled, set **Home Assistant MQTT Discovery** to **Disabled**, and save.\n3. If Discovery was enabled, keep the broker connected until its old MQTT entities disappear from Home Assistant.\n\nOnce these settings are ready, select **Submit** to retry. The PrintDeck integration will manage your sensors and print events."
       }
     },
     "error": {
@@ -64,9 +68,9 @@
       "invalid_input": "Enter a valid local host and API token.",
       "unknown": "An unexpected error occurred.",
       "mqtt_not_ready": "Configure and connect the MQTT integration in Home Assistant first.",
-      "mqtt_no_device": "No PrintDeck identity received. Check the broker, device connection and topic root.",
+      "mqtt_no_device": "No PrintDeck identity was received through MQTT. Check that PrintDeck is online and connected to the same broker as Home Assistant.",
       "invalid_topic_root": "Enter the complete topic root shown by PrintDeck.",
-      "mqtt_discovery_conflict": "Disable automatic Home Assistant Discovery in PrintDeck, wait for cleanup and removal of its MQTT entities, then try again."
+      "mqtt_discovery_conflict": "In this PrintDeck’s Web Config → Device Settings → Unified API → MQTT, disable Home Assistant MQTT Discovery and save. Keep the broker connected until cleanup finishes. If setup is still blocked, check Home Assistant → Settings → Devices & services → Entities for this PrintDeck’s remaining MQTT entities."
     },
     "abort": {
       "already_configured": "This PrintDeck is already configured.",
@@ -237,8 +241,8 @@
   },
   "issues": {
     "mqtt_discovery_conflict": {
-      "title": "PrintDeck MQTT entity ownership",
-      "description": "PrintDeck automatic MQTT Discovery is enabled, cleanup is pending, or standard MQTT entities still exist. Disable automatic Discovery in PrintDeck Web Config and wait for its old MQTT entities to be removed. PrintDeck entities remain unavailable until this is resolved."
+      "title": "PrintDeck: resolve an MQTT Discovery conflict",
+      "description": "PrintDeck has paused this device's HACS entities and print events to avoid duplicates. Automatic MQTT Discovery is enabled, its cleanup is pending, or Home Assistant still has MQTT entities for this PrintDeck.\n\n**If you use PrintDeck through HACS**\n\n1. Open this PrintDeck's Web Config → Device Settings → Unified API → MQTT.\n2. Set **Home Assistant MQTT Discovery** to **Disabled** and select **Save MQTT settings**. Keep the MQTT connection enabled and the same broker reachable while cleanup runs.\n3. Wait for the old Discovery entities to disappear. Your HACS entities are kept; the conflict clears automatically once cleanup is complete and Home Assistant receives the updated state.\n\n**Already Disabled, but the warning remains?** Check the MQTT connection and cleanup status in that Web Config section. In Home Assistant → Settings → Devices & services → Entities, filter by the **MQTT** integration and check for entities belonging to this PrintDeck. If automatic cleanup cannot finish, remove only this device's obsolete retained Discovery configuration from the old broker and its obsolete MQTT entities from Home Assistant. Retained configuration can recreate deleted entities.\n\n**Ignore** only hides this warning; it does not unblock the entities. If you prefer standard MQTT Discovery, disable or remove this device's PrintDeck HACS entry instead. The choice is per PrintDeck; several PrintDecks may monitor the same printer."
     }
   }
 }

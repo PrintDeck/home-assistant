@@ -94,6 +94,7 @@ class PrintDeckConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     def __init__(self) -> None:
         self._discovered_host: str | None = None
+        self._discovered_device_id: str | None = None
         self._reconfiguring = False
 
     def _abort_configured_http_host(self, device_id: str, host: str) -> None:
@@ -228,15 +229,37 @@ class PrintDeckConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         finally:
             unsubscribe()
 
+    def _known_mqtt_root(self) -> str | None:
+        """Derive the topic for a discovered device or an existing entry."""
+        entry = self._get_reconfigure_entry() if self._reconfiguring else None
+        device_id = entry.unique_id if entry is not None else self._discovered_device_id
+        root = entry.data.get(CONF_TOPIC_ROOT) if entry is not None else None
+        if root is None and device_id:
+            root = f"printdeck/{device_id}/v1"
+        if not isinstance(root, str):
+            return None
+        try:
+            return validate_topic_root(root)
+        except ValueError:
+            return None
+
     async def async_step_mqtt(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Use an external broker already configured in Home Assistant."""
+        """Connect automatically when discovery already identifies the device."""
+        known_root = self._known_mqtt_root()
+        if known_root is not None:
+            user_input = {CONF_TOPIC_ROOT: known_root}
         errors: dict[str, str] = {}
         if user_input is not None:
             try:
                 root = validate_topic_root(user_input[CONF_TOPIC_ROOT])
                 info = await self._async_mqtt_info(root)
+                if (
+                    self._discovered_device_id is not None
+                    and info.device_id != self._discovered_device_id
+                ):
+                    raise PrintDeckInvalidResponseError("MQTT discovery identity mismatch")
             except PrintDeckDiscoveryConflict:
                 errors["base"] = "mqtt_discovery_conflict"
             except (ValueError, KeyError):
@@ -257,10 +280,13 @@ class PrintDeckConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     )
                 self._abort_if_unique_id_configured()
                 return self.async_create_entry(title=info.name, data=data)
-        defaults = (
-            dict(self._get_reconfigure_entry().data) if self._reconfiguring else {}
-        )
-        defaults.update(user_input or {})
+        if known_root is not None:
+            return self.async_show_form(
+                step_id="mqtt_auto",
+                data_schema=vol.Schema({}),
+                errors=errors,
+            )
+        defaults = dict(user_input or {})
         return self.async_show_form(
             step_id="mqtt",
             data_schema=vol.Schema(
@@ -273,15 +299,26 @@ class PrintDeckConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
+    async def async_step_mqtt_auto(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Retry automatic MQTT setup after the connection settings are corrected."""
+        return await self.async_step_mqtt(user_input)
+
     async def async_step_zeroconf(
         self, discovery_info: ZeroconfServiceInfo
     ) -> ConfigFlowResult:
         """Handle a PrintDeck announced through mDNS."""
         device_id = discovery_info.properties.get("id")
-        if not device_id or not device_id.startswith("printdeck-"):
+        if not isinstance(device_id, str):
+            return self.async_abort(reason="invalid_discovery")
+        try:
+            validate_topic_root(f"printdeck/{device_id}/v1")
+        except ValueError:
             return self.async_abort(reason="invalid_discovery")
         await self.async_set_unique_id(device_id)
         self._abort_configured_http_host(device_id, discovery_info.host)
+        self._discovered_device_id = device_id
         self._discovered_host = discovery_info.host.rstrip(".")
         suffix = device_id.removeprefix("printdeck-")[-6:].upper()
         self.context["title_placeholders"] = {

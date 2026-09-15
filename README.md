@@ -56,9 +56,17 @@ For **MQTT through HACS**:
 3. Keep **automatic Home Assistant Discovery** in PrintDeck disabled. If it was
    enabled, wait for cleanup to finish and the standard MQTT entities to disappear
    from Home Assistant before proceeding.
-4. Add PrintDeck, choose **MQTT via Mosquitto**, and copy the complete topic root
-   shown in PrintDeck, for example `printdeck/printdeck-a1b2c3d4e5f6/v1`.
-   This is a topic, not a broker address.
+4. Open the discovered PrintDeck in Home Assistant and choose **MQTT via
+   Mosquitto**. The integration determines its topic automatically and verifies
+   the device through the broker. No topic entry is needed. If the connection is
+   not ready, follow the displayed steps and submit again to retry.
+
+When adding a device manually without discovery, copy **MQTT topic root** from
+PrintDeck Web Config → Device Settings → Unified API → MQTT into the setup form.
+Use the complete value for your device, for example
+`printdeck/printdeck-a1b2c3d4e5f6/v1`, not the broker address. Reconfiguring an
+existing HTTP integration to MQTT also determines the topic automatically from
+the saved device identity.
 
 For **automatic MQTT Discovery without HACS**, complete the first two MQTT steps
 and enable automatic Home Assistant Discovery in PrintDeck. Its devices and

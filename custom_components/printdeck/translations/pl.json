@@ -46,13 +46,17 @@
       },
       "mqtt": {
         "title": "Połącz przez MQTT",
-        "description": "Skonfiguruj MQTT w Home Assistant i PrintDeck z tym samym brokerem. Wyłącz automatyczne wykrywanie Home Assistant w PrintDeck i poczekaj na usunięcie jego encji MQTT, a następnie wpisz główny temat pokazany przez PrintDeck. Encjami będzie zarządzać integracja PrintDeck.",
+        "description": "**Przygotuj połączenie**\n\n1. Połącz Home Assistant i PrintDeck z tym samym brokerem MQTT (np. Mosquitto).\n2. W Web Config PrintDecka → Ustawienia urządzenia → Ujednolicone API → MQTT ustaw **Automatyczne wykrywanie MQTT w Home Assistant** na **Wyłączone** i zapisz. Pozostaw MQTT włączone na czas usuwania starych wpisów Discovery.\n3. Skopiuj **Główny temat MQTT** z początku tej sekcji MQTT do pola poniżej.\n\nIntegracja PrintDeck będzie zarządzać sensorami i zdarzeniami druku. Jeśli dodasz PrintDeck z listy urządzeń wykrytych przez Home Assistant, temat zostanie ustalony automatycznie.",
         "data": {
           "topic_root": "Główny temat PrintDeck"
         },
         "data_description": {
-          "topic_root": "Na przykład: printdeck/printdeck-a1b2c3d4e5f6/v1. Nie wpisuj adresu brokera."
+          "topic_root": "Skopiuj cały Główny temat MQTT z Web Config PrintDecka → Ustawienia urządzenia → Ujednolicone API → MQTT. Przykładowy format: printdeck/printdeck-a1b2c3d4e5f6/v1. Użyj wartości swojego urządzenia, a nie adresu brokera."
         }
+      },
+      "mqtt_auto": {
+        "title": "Dokończ połączenie MQTT",
+        "description": "Temat MQTT tego PrintDecka jest już znany. Nie musisz go wpisywać.\n\n**Sprawdź ustawienia**\n\n1. Połącz Home Assistant i PrintDeck z tym samym brokerem MQTT.\n2. W Web Config PrintDecka → Ustawienia urządzenia → Ujednolicone API → MQTT pozostaw **Połączenie MQTT** włączone, ustaw **Automatyczne wykrywanie MQTT w Home Assistant** na **Wyłączone** i zapisz.\n3. Jeśli Discovery było włączone, zachowaj połączenie z brokerem, aż stare encje MQTT znikną z Home Assistant.\n\nPo przygotowaniu ustawień wybierz **Zatwierdź (Submit)**, aby ponowić próbę. Integracja PrintDeck będzie zarządzać sensorami i zdarzeniami druku."
       }
     },
     "error": {
@@ -64,9 +68,9 @@
       "invalid_input": "Podaj prawidłowy lokalny host i token API.",
       "unknown": "Wystąpił nieoczekiwany błąd.",
       "mqtt_not_ready": "Najpierw skonfiguruj i połącz integrację MQTT w Home Assistant.",
-      "mqtt_no_device": "Nie odebrano tożsamości PrintDeck. Sprawdź broker, połączenie urządzenia i główny temat.",
+      "mqtt_no_device": "Nie odebrano tożsamości PrintDecka przez MQTT. Sprawdź, czy PrintDeck jest dostępny i połączony z tym samym brokerem co Home Assistant.",
       "invalid_topic_root": "Wpisz pełny główny temat pokazany przez PrintDeck.",
-      "mqtt_discovery_conflict": "Wyłącz automatyczne wykrywanie Home Assistant w PrintDeck, poczekaj na zakończenie porządkowania i usunięcie encji MQTT, a następnie spróbuj ponownie."
+      "mqtt_discovery_conflict": "W Web Config tego PrintDecka → Ustawienia urządzenia → Ujednolicone API → MQTT wyłącz Automatyczne wykrywanie MQTT w Home Assistant i zapisz. Zachowaj połączenie z brokerem do końca porządkowania. Jeśli konfiguracja nadal jest blokowana, sprawdź pozostałe encje MQTT tego PrintDecka w Home Assistant → Ustawienia → Urządzenia oraz usługi → Encje."
     },
     "abort": {
       "already_configured": "Ten PrintDeck jest już skonfigurowany.",
@@ -237,8 +241,8 @@
   },
   "issues": {
     "mqtt_discovery_conflict": {
-      "title": "Zarządzanie encjami MQTT PrintDeck",
-      "description": "Automatyczne wykrywanie MQTT w PrintDeck jest włączone, trwa porządkowanie lub standardowe encje MQTT nadal istnieją. Wyłącz automatyczne wykrywanie w Web Config PrintDeck i poczekaj na usunięcie poprzednich encji MQTT. Do tego czasu encje integracji PrintDeck pozostaną niedostępne."
+      "title": "PrintDeck: usuń konflikt encji MQTT",
+      "description": "PrintDeck wstrzymał aktualizowanie encji HACS i zdarzenia druku tego urządzenia, aby uniknąć duplikatów. Automatyczne MQTT Discovery jest włączone, trwa jego porządkowanie lub Home Assistant nadal ma encje MQTT tego PrintDecka.\n\n**Jeśli korzystasz z PrintDeck przez HACS**\n\n1. Otwórz Web Config tego PrintDecka → Ustawienia urządzenia → Ujednolicone API → MQTT.\n2. Ustaw **Automatyczne wykrywanie MQTT w Home Assistant** na **Wyłączone (Disabled)** i wybierz **Zapisz ustawienia MQTT**. Pozostaw połączenie MQTT włączone i zapewnij dostęp do tego samego brokera na czas porządkowania.\n3. Poczekaj na usunięcie starych encji Discovery. Twoje encje HACS zostają; konflikt znika automatycznie po zakończeniu porządkowania i odebraniu aktualnego stanu przez Home Assistant.\n\n**Jest już Disabled, ale ostrzeżenie pozostaje?** Sprawdź stan połączenia MQTT i porządkowania w tej samej sekcji Web Config. W Home Assistant → Ustawienia → Urządzenia oraz usługi → Encje ustaw filtr integracji **MQTT** i sprawdź encje należące do tego PrintDecka. Jeśli automatyczne porządkowanie nie może się zakończyć, usuń wyłącznie jego nieaktualną konfigurację Discovery zapisaną na starym brokerze jako retained oraz jego nieaktualne encje MQTT w Home Assistant. Zachowana konfiguracja może odtworzyć usunięte encje.\n\n**Ignoruj (Ignore)** tylko ukrywa ostrzeżenie; nie odblokowuje encji. Jeśli wolisz standardowe MQTT Discovery, wyłącz lub usuń wpis tego urządzenia w integracji PrintDeck HACS. Wybór dotyczy każdego PrintDecka osobno; kilka PrintDecków może obserwować tę samą drukarkę."
     }
   }
 }

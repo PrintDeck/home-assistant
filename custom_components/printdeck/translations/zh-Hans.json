@@ -46,13 +46,17 @@
       },
       "mqtt": {
         "title": "通过 MQTT 连接",
-        "description": "在 Home Assistant 和 PrintDeck 中配置同一个 MQTT 代理。关闭 PrintDeck 的 Home Assistant 自动发现，等待其 MQTT 实体被移除，然后输入 PrintDeck 显示的主题根路径。实体将由 PrintDeck 集成管理。",
+        "description": "**准备连接**\n\n1. 将 Home Assistant 和 PrintDeck 连接到同一个 MQTT 服务器（例如 Mosquitto）。\n2. 在 PrintDeck 的 Web Config → 设备设置 → 统一 API → MQTT 中，禁用 **Home Assistant MQTT 自动发现**并保存。删除旧 Discovery 条目期间，请保持 MQTT 启用。\n3. 将该 MQTT 区域顶部显示的 **MQTT 主题根路径**完整复制到下方输入框。\n\nPrintDeck 集成将管理传感器和打印事件。如果从 Home Assistant 发现的设备列表添加 PrintDeck，系统会自动确定主题。",
         "data": {
           "topic_root": "PrintDeck 主题根路径"
         },
         "data_description": {
-          "topic_root": "例如：printdeck/printdeck-a1b2c3d4e5f6/v1。请勿输入代理地址。"
+          "topic_root": "从 PrintDeck 的 Web Config → 设备设置 → 统一 API → MQTT 复制完整的 MQTT 主题根路径。格式示例：printdeck/printdeck-a1b2c3d4e5f6/v1。请使用你自己设备的值，而不是服务器地址。"
         }
+      },
+      "mqtt_auto": {
+        "title": "完成 MQTT 连接",
+        "description": "此 PrintDeck 的 MQTT 主题已知，无需手动输入。\n\n**检查以下设置**\n\n1. 将 Home Assistant 和 PrintDeck 连接到同一个 MQTT 服务器。\n2. 在 PrintDeck 的 Web Config → 设备设置 → 统一 API → MQTT 中，保持 **MQTT 连接**启用，禁用 **Home Assistant MQTT 自动发现**并保存。\n3. 如果之前启用了 Discovery，请保持服务器连接，直到旧 MQTT 实体从 Home Assistant 中消失。\n\n设置完成后，选择**提交（Submit）**重试。PrintDeck 集成将管理传感器和打印事件。"
       }
     },
     "error": {
@@ -64,9 +68,9 @@
       "invalid_input": "请输入有效的本地主机和 API 令牌。",
       "unknown": "发生了意外错误。",
       "mqtt_not_ready": "请先在 Home Assistant 中配置并连接 MQTT 集成。",
-      "mqtt_no_device": "未收到 PrintDeck 身份信息。请检查代理、设备连接和主题根路径。",
+      "mqtt_no_device": "未通过 MQTT 收到 PrintDeck 身份信息。请检查 PrintDeck 是否在线，并与 Home Assistant 连接到同一个服务器。",
       "invalid_topic_root": "请输入 PrintDeck 显示的完整主题根路径。",
-      "mqtt_discovery_conflict": "请关闭 PrintDeck 的 Home Assistant 自动发现，等待清理完成并移除 MQTT 实体后重试。"
+      "mqtt_discovery_conflict": "在此 PrintDeck 的 Web Config → 设备设置 → 统一 API → MQTT 中禁用 Home Assistant MQTT 自动发现 并保存。保持服务器连接，直到清理完成。如果仍无法配置，请在 Home Assistant → 设置 → 设备与服务 → 实体中检查此 PrintDeck 剩余的 MQTT 实体。"
     },
     "abort": {
       "already_configured": "此 PrintDeck 已配置。",
@@ -237,8 +241,8 @@
   },
   "issues": {
     "mqtt_discovery_conflict": {
-      "title": "PrintDeck MQTT 实体管理",
-      "description": "PrintDeck 的 MQTT 自动发现已启用、清理尚未完成，或标准 MQTT 实体仍然存在。请在 PrintDeck Web Config 中关闭自动发现，并等待旧 MQTT 实体被移除。在此之前，PrintDeck 实体将保持不可用。"
+      "title": "PrintDeck：解决 MQTT 实体冲突",
+      "description": "为避免重复，PrintDeck 已暂停此设备的 HACS 实体更新和打印事件。原因可能是 MQTT Discovery 仍处于启用状态、清理尚未完成，或 Home Assistant 中仍有此 PrintDeck 的 MQTT 实体。\n\n**如果你通过 HACS 使用 PrintDeck**\n\n1. 打开此 PrintDeck 的 Web Config → 设备设置 → 统一 API → MQTT。\n2. 将 **Home Assistant MQTT 自动发现** 设为**已禁用（Disabled）**，然后选择**保存 MQTT 设置**。清理期间，请保持 MQTT 连接启用，并确保原 MQTT 服务器可访问。\n3. 等待旧的 Discovery 实体被移除。HACS 实体会保留；清理完成且 Home Assistant 收到更新后的状态后，冲突会自动解除。\n\n**已经禁用，但警告仍然存在？** 在上述 Web Config 页面检查 MQTT 连接和清理状态。在 Home Assistant → 设置 → 设备与服务 → 实体中，按 **MQTT** 集成筛选，检查属于此 PrintDeck 的实体。如果自动清理无法完成，请仅移除旧服务器上属于此设备的过期 Discovery 保留配置（retained），以及 Home Assistant 中对应的过期 MQTT 实体。保留配置可能重新创建已删除的实体。\n\n**忽略（Ignore）**只会隐藏警告，不会解除实体阻塞。如果你更希望使用标准 MQTT Discovery，请停用或移除此设备的 PrintDeck HACS 配置条目。每台 PrintDeck 可单独选择；多台 PrintDeck 可以监测同一台打印机。"
     }
   }
 }
