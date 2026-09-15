@@ -201,6 +201,37 @@
           "summary": "Resumen",
           "full": "Completo"
         }
+      },
+      "condition": {
+        "name": "Condición de la impresora",
+        "state": {
+          "unknown": "Desconocida",
+          "normal": "Normal",
+          "ready": "Preparada",
+          "busy": "Ocupada",
+          "attention": "Requiere atención",
+          "error": "Error"
+        }
+      }
+    },
+    "event": {
+      "print_events": {
+        "name": "Eventos de impresión",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "started": "Impresión iniciada",
+              "paused": "Impresión pausada",
+              "resumed": "Impresión reanudada",
+              "completed": "Impresión completada",
+              "failed": "Impresión fallida",
+              "cancelled": "Impresión cancelada",
+              "milestone": "Hito de progreso",
+              "attention": "Se requiere atención",
+              "attention_cleared": "Problema resuelto"
+            }
+          }
+        }
       }
     }
   },

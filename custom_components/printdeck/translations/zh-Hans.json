@@ -201,6 +201,37 @@
           "summary": "摘要",
           "full": "完整"
         }
+      },
+      "condition": {
+        "name": "打印机状况",
+        "state": {
+          "unknown": "未知",
+          "normal": "正常",
+          "ready": "就绪",
+          "busy": "忙碌",
+          "attention": "需要注意",
+          "error": "错误"
+        }
+      }
+    },
+    "event": {
+      "print_events": {
+        "name": "打印事件",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "started": "打印已开始",
+              "paused": "打印已暂停",
+              "resumed": "打印已恢复",
+              "completed": "打印已完成",
+              "failed": "打印失败",
+              "cancelled": "打印已取消",
+              "milestone": "已达到进度阈值",
+              "attention": "需要注意",
+              "attention_cleared": "问题已解决"
+            }
+          }
+        }
       }
     }
   },

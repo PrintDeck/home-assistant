@@ -201,6 +201,37 @@
           "summary": "Podsumowanie",
           "full": "Pełne dane"
         }
+      },
+      "condition": {
+        "name": "Stan drukarki",
+        "state": {
+          "unknown": "Nieznany",
+          "normal": "Normalny",
+          "ready": "Gotowa",
+          "busy": "Zajęta",
+          "attention": "Wymaga uwagi",
+          "error": "Błąd"
+        }
+      }
+    },
+    "event": {
+      "print_events": {
+        "name": "Zdarzenia wydruku",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "started": "Rozpoczęto wydruk",
+              "paused": "Wstrzymano wydruk",
+              "resumed": "Wznowiono wydruk",
+              "completed": "Zakończono wydruk",
+              "failed": "Wydruk nie powiódł się",
+              "cancelled": "Anulowano wydruk",
+              "milestone": "Osiągnięto próg postępu",
+              "attention": "Wymagana uwaga",
+              "attention_cleared": "Problem ustąpił"
+            }
+          }
+        }
       }
     }
   },

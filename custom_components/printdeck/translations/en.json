@@ -201,6 +201,37 @@
           "summary": "Summary",
           "full": "Full"
         }
+      },
+      "condition": {
+        "name": "Printer condition",
+        "state": {
+          "unknown": "Unknown",
+          "normal": "Normal",
+          "ready": "Ready",
+          "busy": "Busy",
+          "attention": "Attention required",
+          "error": "Error"
+        }
+      }
+    },
+    "event": {
+      "print_events": {
+        "name": "Print events",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "started": "Print started",
+              "paused": "Print paused",
+              "resumed": "Print resumed",
+              "completed": "Print completed",
+              "failed": "Print failed",
+              "cancelled": "Print cancelled",
+              "milestone": "Progress milestone",
+              "attention": "Attention required",
+              "attention_cleared": "Attention cleared"
+            }
+          }
+        }
       }
     }
   },

@@ -201,6 +201,37 @@
           "summary": "Résumé",
           "full": "Complet"
         }
+      },
+      "condition": {
+        "name": "État de l’imprimante",
+        "state": {
+          "unknown": "Inconnu",
+          "normal": "Normal",
+          "ready": "Prête",
+          "busy": "Occupée",
+          "attention": "Attention requise",
+          "error": "Erreur"
+        }
+      }
+    },
+    "event": {
+      "print_events": {
+        "name": "Événements d’impression",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "started": "Impression démarrée",
+              "paused": "Impression en pause",
+              "resumed": "Impression reprise",
+              "completed": "Impression terminée",
+              "failed": "Échec de l’impression",
+              "cancelled": "Impression annulée",
+              "milestone": "Seuil de progression atteint",
+              "attention": "Attention requise",
+              "attention_cleared": "Problème résolu"
+            }
+          }
+        }
       }
     }
   },

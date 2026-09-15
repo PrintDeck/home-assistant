@@ -1,0 +1,71 @@
+blueprint:
+  name: "PrintDeck: Reaguj na zdarzenia wydruku"
+  description: "Uruchamia wybrane działania dla zdarzeń ze wszystkich obecnych i przyszłych urządzeń PrintDeck. Każdy PrintDeck jest osobnym źródłem. Zadania kalibracji są pomijane."
+  domain: automation
+  author: kitek
+  homeassistant:
+    min_version: 2025.10.0
+  input:
+    event_types:
+      name: "Rodzaje zdarzeń"
+      description: "Wybierz zdarzenia uruchamiające działania."
+      default: [started, completed, failed, milestone]
+      selector:
+        select:
+          multiple: true
+          options:
+            - label: "Rozpoczęto wydruk"
+              value: started
+            - label: "Wstrzymano wydruk"
+              value: paused
+            - label: "Wznowiono wydruk"
+              value: resumed
+            - label: "Zakończono wydruk"
+              value: completed
+            - label: "Wydruk nie powiódł się"
+              value: failed
+            - label: "Anulowano wydruk"
+              value: cancelled
+            - label: "Osiągnięto próg postępu"
+              value: milestone
+            - label: "Wymagana uwaga"
+              value: attention
+            - label: "Problem ustąpił"
+              value: attention_cleared
+    printdeck_source:
+      name: "ID PrintDecka"
+      description: "Pozostaw puste, aby uwzględnić wszystkie urządzenia, lub wpisz printdeck_id wybranego źródła."
+      default: ""
+      selector:
+        text:
+    event_actions:
+      name: "Działania"
+      description: "W szablonach działań możesz użyć printer_name, printdeck_id, printer_id, job_id, event_type, progress_percent i milestone."
+      default: []
+      selector:
+        action:
+
+triggers:
+  - trigger: event
+    event_type: printdeck_event
+variables:
+  selected_events: !input event_types
+  selected_source: !input printdeck_source
+conditions:
+  - condition: template
+    value_template: >-
+      {{ trigger.event.data.event_type in selected_events
+          and trigger.event.data.job_kind == 'print'
+          and (selected_source | trim == '' or trigger.event.data.printdeck_id == selected_source | trim) }}
+actions:
+  - variables:
+      printer_name: "{{ trigger.event.data.printer_name }}"
+      printdeck_id: "{{ trigger.event.data.printdeck_id }}"
+      printer_id: "{{ trigger.event.data.printer_id }}"
+      job_id: "{{ trigger.event.data.job_id }}"
+      event_type: "{{ trigger.event.data.event_type }}"
+      progress_percent: "{{ trigger.event.data.progress_percent }}"
+      milestone: "{{ trigger.event.data.milestone }}"
+  - sequence: !input event_actions
+mode: queued
+max: 50

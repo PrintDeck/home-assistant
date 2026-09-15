@@ -1,0 +1,71 @@
+blueprint:
+  name: "PrintDeck：响应打印事件"
+  description: "为所有现有和未来的 PrintDeck 设备事件执行所选操作。每个 PrintDeck 都是独立来源，不包含校准任务。"
+  domain: automation
+  author: kitek
+  homeassistant:
+    min_version: 2025.10.0
+  input:
+    event_types:
+      name: "事件类型"
+      description: "选择触发操作的事件。"
+      default: [started, completed, failed, milestone]
+      selector:
+        select:
+          multiple: true
+          options:
+            - label: "打印已开始"
+              value: started
+            - label: "打印已暂停"
+              value: paused
+            - label: "打印已恢复"
+              value: resumed
+            - label: "打印已完成"
+              value: completed
+            - label: "打印失败"
+              value: failed
+            - label: "打印已取消"
+              value: cancelled
+            - label: "已达到进度阈值"
+              value: milestone
+            - label: "需要注意"
+              value: attention
+            - label: "问题已解决"
+              value: attention_cleared
+    printdeck_source:
+      name: "PrintDeck ID"
+      description: "留空以包含所有设备，或输入一个 printdeck_id 来筛选来源。"
+      default: ""
+      selector:
+        text:
+    event_actions:
+      name: "操作"
+      description: "可在操作模板中使用 printer_name、printdeck_id、printer_id、job_id、event_type、progress_percent 和 milestone。"
+      default: []
+      selector:
+        action:
+
+triggers:
+  - trigger: event
+    event_type: printdeck_event
+variables:
+  selected_events: !input event_types
+  selected_source: !input printdeck_source
+conditions:
+  - condition: template
+    value_template: >-
+      {{ trigger.event.data.event_type in selected_events
+          and trigger.event.data.job_kind == 'print'
+          and (selected_source | trim == '' or trigger.event.data.printdeck_id == selected_source | trim) }}
+actions:
+  - variables:
+      printer_name: "{{ trigger.event.data.printer_name }}"
+      printdeck_id: "{{ trigger.event.data.printdeck_id }}"
+      printer_id: "{{ trigger.event.data.printer_id }}"
+      job_id: "{{ trigger.event.data.job_id }}"
+      event_type: "{{ trigger.event.data.event_type }}"
+      progress_percent: "{{ trigger.event.data.progress_percent }}"
+      milestone: "{{ trigger.event.data.milestone }}"
+  - sequence: !input event_actions
+mode: queued
+max: 50

@@ -46,6 +46,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if isinstance(coordinator, PrintDeckMqttCoordinator):
             coordinator.async_stop()
         raise
+    coordinator.events.enabled = True
+    entry.async_on_unload(coordinator.events.cursor.reset)
     return True
 
 

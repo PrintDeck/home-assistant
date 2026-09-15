@@ -12,6 +12,7 @@ from typing import Any
 
 from aiohttp import ClientError, ClientSession
 
+from .print_events import PrintEvents, parse_print_events
 from .const import API_VERSION
 
 REQUEST_TIMEOUT_SECONDS = 10
@@ -108,6 +109,9 @@ class PrintDeckPrinter:
     bed_current_c: float | None
     bed_target_c: float | None
     chamber_current_c: float | None
+    condition: str = "unknown"
+    updated_at_ms: int = 0
+    print_events: PrintEvents | None = None
 
 
 @dataclass(frozen=True)
@@ -238,7 +242,14 @@ def parse_printer(printer_value: Any, status_value: Any) -> PrintDeckPrinter:
     progress = _number(
         job.get("progress_percent"), "status.job.progress_percent", nullable=True
     )
+    try:
+        events = parse_print_events(status.get("print_events"))
+    except ValueError as err:
+        raise PrintDeckInvalidResponseError("Invalid PrintDeck event journal") from err
     return PrintDeckPrinter(
+        print_events=events,
+        condition=_string(job.get("condition"), "status.job.condition", default="unknown") or "unknown",
+        updated_at_ms=max(0, _integer(connection.get("updated_at_ms"), "status.connection.updated_at_ms")),
         printer_id=str(printer_id),
         name=_string(printer.get("name"), "printer.name") or f"Printer {printer_id}",
         protocol=protocol,

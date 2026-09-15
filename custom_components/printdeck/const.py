@@ -3,7 +3,7 @@
 from datetime import timedelta
 
 DOMAIN = "printdeck"
-PLATFORMS = ["binary_sensor", "sensor"]
+PLATFORMS = ["binary_sensor", "sensor", "event"]
 
 CONF_TOKEN = "token"
 DEFAULT_HOST = "printdeck.local"

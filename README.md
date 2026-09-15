@@ -119,6 +119,50 @@ Only the printer selected in PrintDeck has a full live connection. Other printer
 keep their existing summary polling cadence. Missing values remain unknown;
 `stale` and `summary` semantics are preserved in both transports.
 
+## Print events
+
+Firmware with print-event support adds a **Print events** entity per printer
+and a **Printer condition** sensor. Existing sensors and their unique IDs stay
+unchanged. Known progress and elapsed time can also be supplied by summary
+polling; they are not restricted to the selected printer.
+
+The integration emits `printdeck_event` on Home Assistant's event bus. Its
+payload includes `event_type`, `printdeck_id`, `printer_id`, `printer_name`,
+`device_id` (the HA printer device), `job_id`, `event_id`, `routing_key`,
+`job_kind`, `progress_percent`, `milestone` and `condition`.
+The routing key is `<printdeck_id>:<printer_id>`. Several PrintDecks observing
+the same printer intentionally remain independent sources.
+
+Use the **Respond to print events** blueprint in
+`blueprints/automation/printdeck/print_events.yaml` for all current and future
+printers. Choose actions and event types; leave the source empty for every
+PrintDeck, or enter a `printdeck_id` to select one source. Polish, Spanish,
+French, German and Simplified Chinese variants are alongside it. Action
+variables include `printer_name`, `event_type`, `milestone` and the source IDs.
+This blueprint requires HACS; native MQTT Discovery event entities can be used
+directly in Home Assistant automations.
+
+Supported types are `started`, `paused`, `resumed`, `completed`, `failed`,
+`cancelled`, `milestone`, `attention` and `attention_cleared`. `started` includes
+job preparation. Progress thresholds are 25, 50 and 75; a jump across multiple
+thresholds emits each new threshold. The actual percentage is separate from
+`milestone`. The blueprint excludes calibration jobs by default.
+
+PrintDeck generates its own local job IDs without relying on printer-specific
+identifiers. An ID describes an observed session, not a permanent print-history
+record. Initial connection and recovery are quiet. A print already running at
+startup does not announce a new start. A device restart or an observation gap
+may establish a new local session. Event history is limited to eight records
+per printer in RAM. HACS ignores records older than 30 seconds and does not
+replay them after reconnecting. Intermediate states between samples can be
+missed; this is not guaranteed delivery. Older firmware retains its normal
+sensors and leaves Print events unavailable.
+
+For native MQTT Discovery, firmware publishes individual events without retain
+at `printdeck/<printdeck_id>/v1/printers/<printer_id>/events`. The source IDs,
+routing key and event ID are included in each message. The existing rule of
+choosing either HACS or standard MQTT Discovery for each PrintDeck still applies.
+
 ## Automation blueprints
 
 - [Turn on a light when a print finishes](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2FPrintDeck%2Fhome-assistant%2Fmain%2Fblueprints%2Fautomation%2Fprintdeck%2Flight_when_print_finishes.yaml)

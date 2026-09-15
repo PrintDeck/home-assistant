@@ -201,6 +201,37 @@
           "summary": "Zusammenfassung",
           "full": "Vollständig"
         }
+      },
+      "condition": {
+        "name": "Druckerzustand",
+        "state": {
+          "unknown": "Unbekannt",
+          "normal": "Normal",
+          "ready": "Bereit",
+          "busy": "Beschäftigt",
+          "attention": "Aufmerksamkeit erforderlich",
+          "error": "Fehler"
+        }
+      }
+    },
+    "event": {
+      "print_events": {
+        "name": "Druckereignisse",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "started": "Druck gestartet",
+              "paused": "Druck pausiert",
+              "resumed": "Druck fortgesetzt",
+              "completed": "Druck abgeschlossen",
+              "failed": "Druck fehlgeschlagen",
+              "cancelled": "Druck abgebrochen",
+              "milestone": "Fortschrittsmarke erreicht",
+              "attention": "Aufmerksamkeit erforderlich",
+              "attention_cleared": "Problem behoben"
+            }
+          }
+        }
       }
     }
   },

@@ -24,6 +24,7 @@ from .api import (
 )
 from .const import DEFAULT_UPDATE_INTERVAL, DOMAIN
 from .identity import device_belongs_to_missing_printer
+from .event_hub import PrintDeckEventHub
 from .ownership import has_standard_mqtt_entities, update_discovery_issue
 
 _LOGGER = logging.getLogger(__name__)
@@ -52,6 +53,7 @@ class PrintDeckCoordinator(DataUpdateCoordinator[PrintDeckCoordinatorData]):
             update_interval=DEFAULT_UPDATE_INTERVAL,
             always_update=False,
         )
+        self.events = PrintDeckEventHub(hass)
         self.client = client
         self.info: PrintDeckInfo | None = None
 
@@ -66,6 +68,7 @@ class PrintDeckCoordinator(DataUpdateCoordinator[PrintDeckCoordinatorData]):
         conflict = has_standard_mqtt_entities(self.hass, self.info.device_id)
         update_discovery_issue(self.hass, self.config_entry.entry_id, conflict)
         if conflict:
+            self.events.cursor.reset()
             raise UpdateFailed(
                 "Disable automatic MQTT Discovery and wait for its entities to be removed"
             )
@@ -85,16 +88,24 @@ class PrintDeckCoordinator(DataUpdateCoordinator[PrintDeckCoordinatorData]):
         try:
             snapshot = await self.client.async_get_snapshot()
         except PrintDeckAuthenticationError as err:
+            self.events.cursor.reset()
             raise ConfigEntryAuthFailed from err
         except PrintDeckRateLimitedError as err:
+            self.events.cursor.reset()
             raise UpdateFailed("PrintDeck request limit reached") from err
         except PrintDeckApiDisabledError as err:
+            self.events.cursor.reset()
             raise UpdateFailed("Unified Printer API is disabled") from err
         except PrintDeckUnsupportedError as err:
+            self.events.cursor.reset()
             raise UpdateFailed("PrintDeck API is not supported") from err
         except PrintDeckApiError as err:
+            self.events.cursor.reset()
             raise UpdateFailed(str(err)) from err
+        self.events.cursor.prune({printer.printer_id for printer in snapshot.printers})
         self._async_remove_missing_printer_devices(snapshot.printers)
+        for printer in snapshot.printers:
+            self.events.consume(self.info, printer)
         return PrintDeckCoordinatorData(
             info=self.info, power=snapshot.power, printers=snapshot.printers
         )

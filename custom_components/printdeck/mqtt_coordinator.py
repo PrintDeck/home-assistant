@@ -17,6 +17,7 @@ from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import PrintDeckApiError, PrintDeckInfo
+from .event_hub import PrintDeckEventHub
 from .const import CONF_TOPIC_ROOT, DOMAIN
 from .coordinator import PrintDeckCoordinator, PrintDeckCoordinatorData
 from .mqtt_state import PrintDeckDiscoveryConflict, PrintDeckMqttState
@@ -33,6 +34,7 @@ class PrintDeckMqttCoordinator(PrintDeckCoordinator):
         DataUpdateCoordinator.__init__(
             self, hass, _LOGGER, config_entry=entry, name=DOMAIN, always_update=False
         )
+        self.events = PrintDeckEventHub(hass)
         self.state = PrintDeckMqttState(entry.data[CONF_TOPIC_ROOT])
         self.info: PrintDeckInfo | None = None
         self._unsubscribers: list[Callable[[], None]] = []
@@ -118,6 +120,8 @@ class PrintDeckMqttCoordinator(PrintDeckCoordinator):
     def async_stop(self) -> None:
         """Remove every callback before unloading or retrying setup."""
         self._active = False
+        self.events.enabled = False
+        self.events.cursor.reset()
         while self._unsubscribers:
             self._unsubscribers.pop()()
 
@@ -125,6 +129,7 @@ class PrintDeckMqttCoordinator(PrintDeckCoordinator):
     def _connection_changed(self, connected: bool) -> None:
         if not self._active:
             return
+        self.events.cursor.reset()
         self.state.invalidate_live()
         self.async_set_update_error(
             UpdateFailed("Waiting for fresh PrintDeck MQTT state")
@@ -134,6 +139,7 @@ class PrintDeckMqttCoordinator(PrintDeckCoordinator):
     def _message_received(self, message: mqtt.ReceiveMessage) -> None:
         if not self._active:
             return
+        generation = self.state.generation
         try:
             changed = self.state.ingest(
                 message.topic, message.payload, message.retain, monotonic()
@@ -144,6 +150,8 @@ class PrintDeckMqttCoordinator(PrintDeckCoordinator):
             # Never log incoming payloads, which can contain names and network addresses.
             _LOGGER.debug("Ignored invalid PrintDeck MQTT message")
         else:
+            if generation != self.state.generation:
+                self.events.cursor.reset()
             if changed:
                 self._publish_current()
 
@@ -159,7 +167,9 @@ class PrintDeckMqttCoordinator(PrintDeckCoordinator):
         registry_conflict = self.info is not None and has_standard_mqtt_entities(
             self.hass, self.info.device_id
         )
-        if self.state.conflict or registry_conflict:
+        self.events.blocked = bool(self.state.conflict or registry_conflict)
+        if self.events.blocked:
+            self.events.cursor.reset()
             update_discovery_issue(self.hass, self.config_entry.entry_id, True)
             self.async_set_update_error(
                 UpdateFailed(
@@ -169,7 +179,14 @@ class PrintDeckMqttCoordinator(PrintDeckCoordinator):
             self._ready.set()
             return
         update_discovery_issue(self.hass, self.config_entry.entry_id, False)
-        snapshot = self.state.snapshot(monotonic())
+        now = monotonic()
+        self.events.cursor.prune(set(self.state.profiles or {}))
+        if not self.state.online:
+            self.events.cursor.reset()
+        elif self.info is not None:
+            for printer in self.state.event_printers(now):
+                self.events.consume(self.info, printer)
+        snapshot = self.state.snapshot(now)
         if snapshot is None or self.info is None:
             self.async_set_update_error(
                 UpdateFailed("Waiting for fresh PrintDeck MQTT state")

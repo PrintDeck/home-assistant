@@ -32,6 +32,7 @@ from .const import (
     REACHABILITY_OPTIONS,
 )
 from .coordinator import PrintDeckCoordinator
+from .print_events import CONDITIONS
 from .entity import PrintDeckDeviceEntity, PrintDeckEntity
 
 
@@ -67,6 +68,11 @@ DEVICE_SENSORS: tuple[PrintDeckDeviceSensorEntityDescription, ...] = (
 
 SENSORS: tuple[PrintDeckSensorEntityDescription, ...] = (
     PrintDeckSensorEntityDescription(
+        key="condition", translation_key="condition", icon="mdi:printer-alert",
+        device_class=SensorDeviceClass.ENUM, options=list(CONDITIONS),
+        value_fn=lambda printer: printer.condition,
+    ),
+    PrintDeckSensorEntityDescription(
         key="phase",
         translation_key="phase",
         icon="mdi:printer-3d",
@@ -90,7 +96,6 @@ SENSORS: tuple[PrintDeckSensorEntityDescription, ...] = (
         native_unit_of_measurement=PERCENTAGE,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=1,
-        requires_full_detail=True,
         value_fn=lambda printer: printer.progress_percent,
     ),
     PrintDeckSensorEntityDescription(
@@ -121,7 +126,6 @@ SENSORS: tuple[PrintDeckSensorEntityDescription, ...] = (
         icon="mdi:timer-outline",
         device_class=SensorDeviceClass.DURATION,
         native_unit_of_measurement=UnitOfTime.SECONDS,
-        requires_full_detail=True,
         value_fn=lambda printer: printer.elapsed_seconds,
     ),
     PrintDeckSensorEntityDescription(

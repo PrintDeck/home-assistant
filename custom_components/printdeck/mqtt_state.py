@@ -188,6 +188,14 @@ class PrintDeckMqttState:
         self.statuses[pid] = (status, now)
         return True
 
+    def event_printers(self, now: float):
+        """Validated observations need neither another printer nor battery telemetry."""
+        if self.conflict or not self.online or self.info is None or self.profiles is None:
+            return ()
+        return tuple(parse_printer(self.profiles[pid], status)
+                     for pid, (status, received) in self.statuses.items()
+                     if pid in self.profiles and now - received < STATE_EXPIRY_SECONDS)
+
     def snapshot(self, now: float) -> PrintDeckSnapshot | None:
         """Return only a complete, live snapshot; absence never deletes devices."""
         if (
