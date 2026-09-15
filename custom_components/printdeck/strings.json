@@ -76,7 +76,11 @@
       "already_configured": "This PrintDeck is already configured.",
       "invalid_discovery": "The discovered service did not include a valid PrintDeck identity.",
       "reauth_successful": "The PrintDeck token was updated.",
-      "reconfigure_successful": "PrintDeck was reconfigured."
+      "reconfigure_successful": "PrintDeck was reconfigured.",
+      "mqtt_disabled": "Automatic setup is off for this PrintDeck. In Web Config → Device Settings → Unified API, enable MQTT and keep Home Assistant MQTT Discovery off to use the PrintDeck integration. You can still add HTTP access manually."
+    },
+    "progress": {
+      "mqtt_connect": "Checking the MQTT connection…\n\nWaiting for this PrintDeck to identify itself through Home Assistant’s broker. This check takes up to 15 seconds.\n\nKeep MQTT connected in PrintDeck Web Config. Home Assistant MQTT Discovery should stay off when using this integration."
     }
   },
   "entity": {

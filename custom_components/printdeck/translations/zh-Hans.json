@@ -76,7 +76,11 @@
       "already_configured": "此 PrintDeck 已配置。",
       "invalid_discovery": "发现的服务未包含有效的 PrintDeck 身份信息。",
       "reauth_successful": "PrintDeck 令牌已更新。",
-      "reconfigure_successful": "PrintDeck 已重新配置。"
+      "reconfigure_successful": "PrintDeck 已重新配置。",
+      "mqtt_disabled": "此 PrintDeck 的自动设置已关闭。请在 Web Config → 设备设置 → Unified API 中启用 MQTT，并保持 Home Assistant MQTT Discovery 关闭，以使用 PrintDeck 集成。仍可手动添加 HTTP 访问。"
+    },
+    "progress": {
+      "mqtt_connect": "正在检查 MQTT 连接…\n\n等待此 PrintDeck 通过 Home Assistant 的服务器发送身份信息。检查最多需要 15 秒。\n\n请在 PrintDeck Web Config 中保持 MQTT 连接。使用此集成时，应保持 Home Assistant MQTT Discovery 关闭。"
     }
   },
   "entity": {

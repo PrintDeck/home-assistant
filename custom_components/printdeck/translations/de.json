@@ -76,7 +76,11 @@
       "already_configured": "Dieses PrintDeck ist bereits konfiguriert.",
       "invalid_discovery": "Der erkannte Dienst enthält keine gültige PrintDeck-Identität.",
       "reauth_successful": "Das PrintDeck-Token wurde aktualisiert.",
-      "reconfigure_successful": "PrintDeck wurde neu konfiguriert."
+      "reconfigure_successful": "PrintDeck wurde neu konfiguriert.",
+      "mqtt_disabled": "Die automatische Einrichtung ist für diesen PrintDeck ausgeschaltet. Aktiviere unter Web Config → Geräteeinstellungen → Unified API MQTT und lasse Home Assistant MQTT Discovery ausgeschaltet, um die PrintDeck-Integration zu nutzen. HTTP-Zugriff kann weiterhin manuell hinzugefügt werden."
+    },
+    "progress": {
+      "mqtt_connect": "MQTT-Verbindung wird geprüft…\n\nWarte auf die Identifikation dieses PrintDeck über den Broker von Home Assistant. Die Prüfung dauert bis zu 15 Sekunden.\n\nLass MQTT in PrintDeck Web Config verbunden. Home Assistant MQTT Discovery sollte für diese Integration ausgeschaltet bleiben."
     }
   },
   "entity": {

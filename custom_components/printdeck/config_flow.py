@@ -96,6 +96,8 @@ class PrintDeckConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._discovered_host: str | None = None
         self._discovered_device_id: str | None = None
         self._reconfiguring = False
+        self._mqtt_task: asyncio.Task[PrintDeckInfo] | None = None
+        self._mqtt_input: dict[str, Any] | None = None
 
     def _abort_configured_http_host(self, device_id: str, host: str) -> None:
         """Keep HTTP address discovery working without altering MQTT entries."""
@@ -200,6 +202,11 @@ class PrintDeckConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     async def _async_mqtt_info(self, root: str) -> PrintDeckInfo:
+        """Bound the complete broker startup, subscription and identity check."""
+        async with asyncio.timeout(15):
+            return await self._async_mqtt_info_within_timeout(root)
+
+    async def _async_mqtt_info_within_timeout(self, root: str) -> PrintDeckInfo:
         """Read bounded retained identity using HA's own MQTT connection."""
         if not await mqtt.async_wait_for_mqtt_client(self.hass):
             raise PrintDeckCannotConnectError("MQTT is not configured")
@@ -224,8 +231,7 @@ class PrintDeckConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self.hass, f"{root}/info", received, qos=1
         )
         try:
-            async with asyncio.timeout(15):
-                return await future
+            return await future
         finally:
             unsubscribe()
 
@@ -246,7 +252,39 @@ class PrintDeckConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_mqtt(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Connect automatically when discovery already identifies the device."""
+        """Start a visible, bounded check without blocking the wizard."""
+        known_root = self._known_mqtt_root()
+        if known_root is not None:
+            user_input = {CONF_TOPIC_ROOT: known_root}
+        self._mqtt_input = user_input
+        if user_input is None:
+            return await self.async_step_mqtt_result()
+        try:
+            root = validate_topic_root(user_input[CONF_TOPIC_ROOT])
+        except (ValueError, KeyError):
+            return await self.async_step_mqtt_result()
+        if self._mqtt_task is None:
+            self._mqtt_task = self.hass.async_create_task(self._async_mqtt_info(root))
+        return await self.async_step_mqtt_connect()
+
+    async def async_step_mqtt_connect(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Let HA refresh the progress view while the same task is running."""
+        assert self._mqtt_task is not None
+        if not self._mqtt_task.done():
+            return self.async_show_progress(
+                step_id="mqtt_connect",
+                progress_action="mqtt_connect",
+                progress_task=self._mqtt_task,
+            )
+        return self.async_show_progress_done(next_step_id="mqtt_result")
+
+    async def async_step_mqtt_result(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Use the completed check to create the entry or show a retry."""
+        user_input = self._mqtt_input
         known_root = self._known_mqtt_root()
         if known_root is not None:
             user_input = {CONF_TOPIC_ROOT: known_root}
@@ -254,7 +292,9 @@ class PrintDeckConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             try:
                 root = validate_topic_root(user_input[CONF_TOPIC_ROOT])
-                info = await self._async_mqtt_info(root)
+                assert self._mqtt_task is not None
+                task, self._mqtt_task = self._mqtt_task, None
+                info = task.result()
                 if (
                     self._discovered_device_id is not None
                     and info.device_id != self._discovered_device_id
@@ -316,8 +356,15 @@ class PrintDeckConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             validate_topic_root(f"printdeck/{device_id}/v1")
         except ValueError:
             return self.async_abort(reason="invalid_discovery")
+        if discovery_info.properties.get("ha_mqtt") != "1":
+            for pending in self._async_in_progress():
+                if (pending["context"].get("source") == "zeroconf"
+                        and pending["context"].get("unique_id") == device_id):
+                    self.hass.config_entries.flow.async_abort(pending["flow_id"])
         await self.async_set_unique_id(device_id)
         self._abort_configured_http_host(device_id, discovery_info.host)
+        if discovery_info.properties.get("ha_mqtt") != "1":
+            return self.async_abort(reason="mqtt_disabled")
         self._discovered_device_id = device_id
         self._discovered_host = discovery_info.host.rstrip(".")
         suffix = device_id.removeprefix("printdeck-")[-6:].upper()

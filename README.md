@@ -38,12 +38,22 @@ for supported entities and troubleshooting.
 | Mode | Home Assistant setup | Entity integration |
 | --- | --- | --- |
 | HTTP API through HACS | Install PrintDeck; enter the local address and Unified API token | PrintDeck |
-| MQTT through HACS | Install PrintDeck; configure HA MQTT and enter the PrintDeck topic root | PrintDeck |
+| MQTT through HACS | Install PrintDeck; configure HA MQTT and add the discovered device | PrintDeck |
 | Automatic MQTT Discovery | Configure HA MQTT and enable automatic Discovery in PrintDeck; HACS is optional | MQTT |
 
 For **HTTP API**, enable Unified Printer API in PrintDeck Web Config, choose
 HTTP API when adding the integration, and enter its local address and raw token
 without the `Bearer` prefix. Existing installations continue to use HTTP.
+
+Automatic setup proposals require MQTT to be enabled in PrintDeck and standard
+Home Assistant MQTT Discovery to be off. Firmware advertises this choice through
+its `ha_mqtt` mDNS property and updates it when settings change. Merely being
+reachable over Wi-Fi or enabling REST API does not propose a new integration.
+Turning MQTT off or selecting standard Discovery withdraws matching unfinished
+HACS discovery flows; configured entries and manual setup flows remain intact.
+Firmware without this advertisement can still be added manually. Existing HTTP
+entries keep automatic address updates. Connection checks show a progress view
+and have a 15-second deadline, including broker startup and subscription.
 
 For **MQTT through HACS**:
 
