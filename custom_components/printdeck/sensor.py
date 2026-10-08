@@ -132,15 +132,19 @@ SENSORS: tuple[PrintDeckSensorEntityDescription, ...] = (
         key="current_layer",
         translation_key="current_layer",
         icon="mdi:layers-outline",
-        requires_full_detail=True,
-        value_fn=lambda printer: printer.current_layer,
+        none_is_unavailable=True,
+        value_fn=lambda printer: (
+            printer.current_layer
+            if (printer.current_layer or 0) > 0
+            else None
+        ),
     ),
     PrintDeckSensorEntityDescription(
         key="total_layers",
         translation_key="total_layers",
         icon="mdi:layers-triple-outline",
-        requires_full_detail=True,
-        value_fn=lambda printer: printer.total_layers,
+        none_is_unavailable=True,
+        value_fn=lambda printer: printer.total_layers if (printer.total_layers or 0) > 0 else None,
     ),
     PrintDeckSensorEntityDescription(
         key="nozzle_temperature",
@@ -149,7 +153,6 @@ SENSORS: tuple[PrintDeckSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.TEMPERATURE,
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         state_class=SensorStateClass.MEASUREMENT,
-        requires_full_detail=True,
         none_is_unavailable=True,
         value_fn=lambda printer: printer.nozzle_current_c,
     ),
@@ -160,7 +163,6 @@ SENSORS: tuple[PrintDeckSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.TEMPERATURE,
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         state_class=SensorStateClass.MEASUREMENT,
-        requires_full_detail=True,
         none_is_unavailable=True,
         value_fn=lambda printer: printer.nozzle_target_c,
     ),
@@ -171,7 +173,6 @@ SENSORS: tuple[PrintDeckSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.TEMPERATURE,
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         state_class=SensorStateClass.MEASUREMENT,
-        requires_full_detail=True,
         none_is_unavailable=True,
         value_fn=lambda printer: printer.bed_current_c,
     ),
@@ -182,7 +183,6 @@ SENSORS: tuple[PrintDeckSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.TEMPERATURE,
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         state_class=SensorStateClass.MEASUREMENT,
-        requires_full_detail=True,
         none_is_unavailable=True,
         value_fn=lambda printer: printer.bed_target_c,
     ),
@@ -193,7 +193,6 @@ SENSORS: tuple[PrintDeckSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.TEMPERATURE,
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         state_class=SensorStateClass.MEASUREMENT,
-        requires_full_detail=True,
         none_is_unavailable=True,
         value_fn=lambda printer: printer.chamber_current_c,
     ),

@@ -134,8 +134,14 @@ status and power messages can restore entities. This prevents a retained catalog
 from being combined with telemetry for a different profile revision.
 
 Only the printer selected in PrintDeck has a full live connection. Other printers
-keep their existing summary polling cadence. Missing values remain unknown;
-`stale` and `summary` semantics are preserved in both transports.
+keep their existing summary polling cadence. Known temperatures and layer counts
+from those periodic observations are available in both HTTP and MQTT modes;
+selecting a different printer does not hide those measurements. Firmware must
+supply the measurements: updating the integration alone cannot recover fields
+omitted by older firmware. Missing values remain unknown and stale observations
+remain unavailable; `summary` still identifies a periodic observation rather
+than a full live connection. Native MQTT Discovery applies the same measurement
+rules in firmware and does not require a HACS update.
 
 ## Print events
 

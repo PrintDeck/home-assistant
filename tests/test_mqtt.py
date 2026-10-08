@@ -106,6 +106,19 @@ class MqttContractTests(unittest.TestCase):
             "printdeck-a1b2c3d4e5f6_4278190081_progress",
         )
 
+    def test_summary_measurements_match_http_and_expire(self) -> None:
+        self.item["printer"]["selected"] = False
+        self.item["status"]["connection"]["detail_level"] = "summary"
+        self.item["status"]["temperatures"]["nozzle_target_c"] = 0
+        self.item["status"]["temperatures"]["chamber_current_c"] = 35
+        self.initialize()
+        actual = self.state.snapshot(100)
+        expected = API.parse_snapshot({"api_version": "v1", "printers": [self.item]})
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual.printers[0].nozzle_target_c, 0)
+        self.assertEqual(actual.printers[0].chamber_current_c, 35)
+        self.assertIsNone(self.state.snapshot(191))
+
     def test_null_measurements_remain_unknown_in_both_transports(self) -> None:
         fields = (
             "progress_percent",
