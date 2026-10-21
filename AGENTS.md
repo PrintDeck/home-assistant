@@ -23,4 +23,3 @@ what was completed, or to record follow-up work across repositories.
   packages, public documentation or a public repository. If PrintDeckTools is
   unavailable, report that the TODO could not be saved; do not silently create
   a competing local list.
-
